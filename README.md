@@ -2,9 +2,14 @@
 
 <div align="center">
 
-**A benchmark operations workspace for AI agent teams**
+[![CI](https://github.com/fathurrahmanhfz/MavyClaw/actions/workflows/ci.yml/badge.svg)](https://github.com/fathurrahmanhfz/MavyClaw/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Full--stack-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Status](https://img.shields.io/badge/status-public_prototype-7c3aed)](#repository-status)
 
-Organize scenarios, track runs, review safety decisions, capture lessons learned, and close the loop with structured post-task reviews.
+## A benchmark operations workspace for AI agent teams
+
+Organize benchmark scenarios, track runs, review safety decisions, capture lessons learned, and close the loop with structured post-task reviews.
 
 </div>
 
@@ -12,43 +17,49 @@ Organize scenarios, track runs, review safety decisions, capture lessons learned
 
 ## What MavyClaw is
 
-MavyClaw is a benchmark ops workspace for teams that have outgrown ad hoc benchmarking in chat threads, scattered docs, and one-off spreadsheets.
+MavyClaw is a benchmark operations workspace for teams that have outgrown ad hoc benchmarking in chat threads, scattered notes, and one-off spreadsheets.
 
-If your team runs agent benchmarks, records execution outcomes, makes safety-sensitive decisions, reviews failures, and wants reusable operational memory, MavyClaw gives you a concrete starting point instead of a blank canvas.
+If your team runs agent benchmarks, evaluates execution quality, makes safety-sensitive decisions, reviews failures, and wants reusable operational memory, MavyClaw gives you a concrete starting point instead of a blank canvas.
 
-## Why this repo is worth installing
+## Why this repo matters
 
 Most agent teams eventually run into the same problems:
 
 - benchmark scenarios live in too many places
 - run history is incomplete or inconsistent
 - safety decisions happen in chat and disappear later
-- lessons from failures do not become reusable process knowledge
+- lessons from failures never become reusable process knowledge
 - post-task reviews have no standard format
-- dashboards are built too late, after the data is already messy
+- dashboards are built too late, after the operational data is already messy
 
-MavyClaw brings those workflows into one app with a structure that is already useful on day one.
+MavyClaw pulls those workflows into one app with a structure that is already useful from the start.
 
-This repository is valuable if you want to stand up an internal benchmark operations workspace quickly, understand the shape of a practical agent ops tool, or use it as a foundation for a more tailored system.
+This repository is valuable if you want to:
+- stand up an internal benchmark ops workspace quickly
+- understand the shape of a practical agent operations product
+- use a real working baseline instead of inventing the entire model from scratch
+- extend a lightweight prototype into a more tailored internal system
 
-## At a glance
+---
 
-| Area | What it covers |
+## Quick value snapshot
+
+| You need | MavyClaw gives you |
 | --- | --- |
-| Scenario catalog | Structured benchmark scenarios with objectives, acceptance criteria, safe steps, anti-patterns, and verification targets |
-| Benchmark runs | Run creation, status tracking, operator notes, evidence, and safety decision linkage |
-| Safety gate | Pre-action review for environment, action mode, affected assets, recovery path, and gate decision |
-| Lessons learned | Failure context, symptoms, root cause, impact, prevention, and promotion level |
-| Post-task review | Final result, verification evidence, what worked, what failed, near-miss, and safest next step |
-| Dashboard | Operational summary across scenarios, runs, lessons, reviews, safety checks, and recent benchmark activity |
+| A place to define evaluation scenarios | A structured scenario catalog with objectives, acceptance criteria, safe steps, anti-patterns, and evidence targets |
+| A better way to record benchmark execution | Benchmark runs with statuses, operator notes, evidence, and linked safety decisions |
+| A pre-action safety workflow | Safety checks for environment, action mode, affected assets, recovery path, and gate decision |
+| A place to retain failure knowledge | Lessons learned with taxonomy, root cause, prevention, and promotion level |
+| A consistent review format | Post-task reviews with final result, evidence, what worked, what failed, and safest next step |
+| A fast operational overview | Dashboard summaries across scenarios, runs, lessons, reviews, safety checks, and recent activity |
 
 ## Core workflow
 
 MavyClaw is built around a simple operational loop:
 
 1. Define benchmark scenarios.
-2. Run the benchmark against a chosen scenario.
-3. Record status, operator notes, and evidence.
+2. Run the benchmark against a selected scenario.
+3. Record status, evidence, and operator notes.
 4. Apply a safety gate before risky actions.
 5. Capture lessons learned from failures or near-misses.
 6. Complete a structured post-task review.
@@ -56,7 +67,7 @@ MavyClaw is built around a simple operational loop:
 
 ---
 
-## Features
+## Feature map
 
 ### Scenario catalog
 Create and review benchmark scenarios with fields that are actually useful in operational work:
@@ -135,6 +146,17 @@ Get a fast operational read on the workspace through:
 
 ---
 
+## Example use cases
+
+MavyClaw is especially useful for teams that want to operationalize work like:
+
+- benchmarking internal coding agents across realistic engineering scenarios
+- tracking infrastructure troubleshooting runs and their outcomes
+- reviewing risky write operations before execution
+- capturing repeated operational failures and turning them into reusable playbooks
+- building a safer review loop around benchmark-driven agent deployment
+- creating internal evidence trails for evaluation and iteration
+
 ## Who this is for
 
 MavyClaw is a strong fit for:
@@ -145,7 +167,7 @@ MavyClaw is a strong fit for:
 - engineering managers who want clearer operational evidence
 - teams designing safer workflows for agent execution
 
-It is a poor fit if you are specifically looking for a fully finished enterprise platform with production persistence, auth, role management, and complete multi-user workflows already in place.
+It is a poor fit if you are specifically looking for a fully finished enterprise platform with production persistence, authentication, role management, and complete multi-user workflows already built out.
 
 ## Why not just start from scratch
 
@@ -162,11 +184,33 @@ MavyClaw gives you a ready-made structure that you can run, inspect, and extend 
 
 ---
 
+## Architecture at a glance
+
+```text
+                        +----------------------+
+                        |      Dashboard       |
+                        | stats, status, recaps|
+                        +----------+-----------+
+                                   |
+                                   v
++----------------+      +----------+-----------+      +-------------------+
+|   Scenarios    | ---> |      Benchmark Runs  | <--- |    Safety Gate    |
+| catalog + risk |      | status, notes, proof |      | review + decision |
++----------------+      +----------+-----------+      +-------------------+
+                                   |
+                                   v
+                        +----------+-----------+
+                        | Lessons + Reviews    |
+                        | memory + closure     |
+                        +----------------------+
+```
+
 ## Repository status
 
 This public repository is currently best described as a polished public prototype.
 
-What is already in place:
+### Already in place
+
 - working frontend and backend app structure
 - seeded sample data for immediate exploration
 - structured operational workflows across scenarios, runs, safety, lessons, and reviews
@@ -174,13 +218,16 @@ What is already in place:
 - health endpoint for runtime checks
 - public CI for typecheck and production build
 
-What is not finished yet:
+### Not finished yet
+
 - database-backed persistence as the default runtime
 - authentication and multi-user support
 - broader automated test coverage beyond the current quality gate
 - full production hardening
 
 That means the repo is already useful for internal evaluation, demos, product exploration, and extension work, but it should not be presented as a finished production platform.
+
+---
 
 ## Technical highlights
 
@@ -194,8 +241,6 @@ That means the repo is already useful for internal evaluation, demos, product ex
 - Zod-based request validation
 - GitHub Actions CI for typecheck and build
 
----
-
 ## Project structure
 
 ```text
@@ -204,6 +249,8 @@ server/   Express API and runtime entrypoint
 shared/   Shared schema and types
 script/   Build scripts
 ```
+
+---
 
 ## Quick start
 
@@ -265,7 +312,7 @@ Current API surface includes routes for:
 
 The API currently includes basic payload validation for create and update flows, plus runtime health reporting.
 
-## Design principles behind the repo
+## Design principles
 
 MavyClaw is built around a few practical ideas:
 
@@ -293,7 +340,7 @@ Teams adopting MavyClaw will likely want to add:
 
 - PostgreSQL-backed persistence
 - auth and role-based access
-- benchmark import/export flows
+- benchmark import and export flows
 - richer run analytics
 - approval workflows
 - attachments or richer evidence handling
