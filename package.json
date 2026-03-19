@@ -1,8 +1,17 @@
 {
-  "name": "rest-express",
+  "name": "mavyclaw",
   "version": "1.0.0",
+  "description": "Workspace operasi benchmark untuk tim agent AI.",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "ai-agents",
+    "benchmark",
+    "agent-ops",
+    "safety-gate",
+    "lessons-learned",
+    "review-workflow"
+  ],
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",

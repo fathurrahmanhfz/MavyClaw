@@ -1,11 +1,52 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
+import { z } from "zod";
+import {
+  insertLessonSchema,
+  insertReviewSchema,
+  insertRunSchema,
+  insertSafetyCheckSchema,
+  insertScenarioSchema,
+} from "@shared/schema";
 import { storage } from "./storage";
+
+const runUpdateSchema = insertRunSchema
+  .partial()
+  .refine((payload) => Object.keys(payload).length > 0, {
+    message: "Minimal satu field harus dikirim untuk update run",
+  });
+
+function validateBody<T>(schema: z.ZodType<T>, payload: unknown) {
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    return {
+      ok: false as const,
+      error: {
+        error: "Payload tidak valid",
+        details: parsed.error.flatten(),
+      },
+    };
+  }
+
+  return {
+    ok: true as const,
+    data: parsed.data,
+  };
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      app: "MavyClaw",
+      runtime: "memory",
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  });
 
   // ── Scenarios ──
   app.get("/api/scenarios", async (_req, res) => {
@@ -20,7 +61,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/scenarios", async (req, res) => {
-    const scenario = await storage.createScenario(req.body);
+    const parsed = validateBody(insertScenarioSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const scenario = await storage.createScenario(parsed.data);
     res.status(201).json(scenario);
   });
 
@@ -37,12 +81,18 @@ export async function registerRoutes(
   });
 
   app.post("/api/runs", async (req, res) => {
-    const run = await storage.createRun(req.body);
+    const parsed = validateBody(insertRunSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const run = await storage.createRun(parsed.data);
     res.status(201).json(run);
   });
 
   app.patch("/api/runs/:id", async (req, res) => {
-    const run = await storage.updateRun(req.params.id, req.body);
+    const parsed = validateBody(runUpdateSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const run = await storage.updateRun(req.params.id, parsed.data);
     if (!run) return res.status(404).json({ error: "Run tidak ditemukan" });
     res.json(run);
   });
@@ -60,16 +110,17 @@ export async function registerRoutes(
   });
 
   app.post("/api/safety-checks", async (req, res) => {
-    const { runId, decision, ...rest } = req.body;
+    const parsed = validateBody(insertSafetyCheckSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
 
-    // Validasi runId jika provided
+    const { runId, decision, ...rest } = parsed.data;
+
     if (runId) {
       const run = await storage.getRun(runId);
       if (!run) {
         return res.status(400).json({ error: `Run dengan ID ${runId} tidak ditemukan` });
       }
 
-      // Sync safetyDecision dan updatedAt ke run terkait
       await storage.updateRun(runId, {
         safetyDecision: decision,
         updatedAt: new Date().toISOString(),
@@ -97,7 +148,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/lessons", async (req, res) => {
-    const lesson = await storage.createLesson(req.body);
+    const parsed = validateBody(insertLessonSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const lesson = await storage.createLesson(parsed.data);
     res.status(201).json(lesson);
   });
 
@@ -114,7 +168,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/reviews", async (req, res) => {
-    const review = await storage.createReview(req.body);
+    const parsed = validateBody(insertReviewSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const review = await storage.createReview(parsed.data);
     res.status(201).json(review);
   });
 

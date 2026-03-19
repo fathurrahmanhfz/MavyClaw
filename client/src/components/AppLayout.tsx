@@ -12,7 +12,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar (mobile only) */}
         <header className="flex items-center gap-3 px-4 py-3 border-b border-border lg:hidden">
           <Button
             variant="ghost"
@@ -22,10 +21,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           >
             <Menu className="w-5 h-5" />
           </Button>
-          <span className="text-sm font-semibold">OpenClaw Sandbox Lab</span>
+          <span className="text-sm font-semibold">MavyClaw</span>
         </header>
 
-        {/* Main content */}
         <main className="flex-1 overflow-y-auto" data-testid="main-content">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {children}
