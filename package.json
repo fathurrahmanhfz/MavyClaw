@@ -1,7 +1,7 @@
 {
   "name": "mavyclaw",
   "version": "1.0.0",
-  "description": "Workspace operasi benchmark untuk tim agent AI.",
+  "description": "A benchmark operations workspace for AI agent teams.",
   "type": "module",
   "license": "MIT",
   "keywords": [

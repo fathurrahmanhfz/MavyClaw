@@ -67,6 +67,22 @@ MavyClaw is built around a simple operational loop:
 
 ---
 
+## Product preview
+
+### Dashboard
+
+![MavyClaw dashboard preview](docs/assets/dashboard-screenshot.png)
+
+The dashboard gives a fast operational read on scenario volume, run activity, lessons, reviews, safety checks, and recent benchmark movement.
+
+### Benchmark runs
+
+![MavyClaw benchmark runs preview](docs/assets/runs-screenshot.png)
+
+The runs page makes it easier to review benchmark execution history, execution status, operator notes, and linked evidence in one place.
+
+---
+
 ## Feature map
 
 ### Scenario catalog
@@ -244,10 +260,11 @@ That means the repo is already useful for internal evaluation, demos, product ex
 ## Project structure
 
 ```text
-client/   React frontend
-server/   Express API and runtime entrypoint
-shared/   Shared schema and types
-script/   Build scripts
+client/        React frontend
+server/        Express API and runtime entrypoint
+shared/        Shared schema and types
+docs/assets/   Public README screenshots
+script/        Build scripts
 ```
 
 ---
@@ -258,6 +275,7 @@ script/   Build scripts
 
 - Node.js 20+
 - npm 10+
+- PostgreSQL-compatible database if you want to continue the database path
 
 ### Local setup
 
@@ -311,6 +329,13 @@ Current API surface includes routes for:
 - `/api/stats`
 
 The API currently includes basic payload validation for create and update flows, plus runtime health reporting.
+
+## Public docs
+
+Additional public repo documents:
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Roadmap](ROADMAP.md)
 
 ## Design principles
 
