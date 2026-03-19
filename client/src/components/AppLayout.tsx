@@ -1,0 +1,40 @@
+import { useState, type ReactNode } from "react";
+import AppSidebar from "./AppSidebar";
+import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PerplexityAttribution } from "./PerplexityAttribution";
+
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar (mobile only) */}
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border lg:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+            data-testid="button-open-sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          <span className="text-sm font-semibold">OpenClaw Sandbox Lab</span>
+        </header>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto" data-testid="main-content">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {children}
+          </div>
+          <footer className="px-4 py-4 text-center">
+            <PerplexityAttribution />
+          </footer>
+        </main>
+      </div>
+    </div>
+  );
+}
