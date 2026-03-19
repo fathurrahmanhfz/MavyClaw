@@ -41,7 +41,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-center h-64" data-testid="error-dashboard">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat data dashboard</p>
+          <p className="text-sm text-muted-foreground">Failed to load dashboard data</p>
         </div>
       </div>
     );
@@ -49,17 +49,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" data-testid="page-dashboard">
-      {/* Header */}
       <div>
         <h2 className="text-xl font-bold tracking-tight" data-testid="heading-dashboard">
           Dashboard
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Ringkasan benchmark, run, dan pelajaran agent ops
+          Benchmark, run, and operational learning summary for agent teams
         </p>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
@@ -72,48 +70,21 @@ export default function Dashboard() {
           ))
         ) : stats ? (
           <>
-            <KpiCard
-              icon={FlaskConical}
-              label="Skenario"
-              value={stats.totalScenarios}
-              testId="kpi-scenarios"
-            />
-            <KpiCard
-              icon={Play}
-              label="Total Run"
-              value={stats.totalRuns}
-              testId="kpi-runs"
-            />
-            <KpiCard
-              icon={BookOpen}
-              label="Pelajaran"
-              value={stats.totalLessons}
-              testId="kpi-lessons"
-            />
-            <KpiCard
-              icon={ClipboardCheck}
-              label="Review"
-              value={stats.totalReviews}
-              testId="kpi-reviews"
-            />
-            <KpiCard
-              icon={ShieldCheck}
-              label="Safety Check"
-              value={stats.totalSafetyChecks}
-              testId="kpi-safety"
-            />
+            <KpiCard icon={FlaskConical} label="Scenarios" value={stats.totalScenarios} testId="kpi-scenarios" />
+            <KpiCard icon={Play} label="Runs" value={stats.totalRuns} testId="kpi-runs" />
+            <KpiCard icon={BookOpen} label="Lessons" value={stats.totalLessons} testId="kpi-lessons" />
+            <KpiCard icon={ClipboardCheck} label="Reviews" value={stats.totalReviews} testId="kpi-reviews" />
+            <KpiCard icon={ShieldCheck} label="Safety Checks" value={stats.totalSafetyChecks} testId="kpi-safety" />
           </>
         ) : null}
       </div>
 
-      {/* Grid: Run status + Lesson status + Error categories */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Run by Status */}
         <Card className="bg-card border-card-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Play className="w-4 h-4 text-primary" />
-              Status Run
+              Run Status
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -127,17 +98,16 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Tidak ada data</p>
+              <p className="text-sm text-muted-foreground">No data</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Lesson by Status */}
         <Card className="bg-card border-card-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary" />
-              Status Pelajaran
+              Lesson Status
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -151,17 +121,16 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Tidak ada data</p>
+              <p className="text-sm text-muted-foreground">No data</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Error Categories */}
         <Card className="bg-card border-card-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
-              Kategori Error
+              Error Categories
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -177,16 +146,15 @@ export default function Dashboard() {
                   </div>
                 ))
             ) : (
-              <p className="text-sm text-muted-foreground">Tidak ada data</p>
+              <p className="text-sm text-muted-foreground">No data</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Runs */}
       <Card className="bg-card border-card-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Benchmark Terbaru</CardTitle>
+          <CardTitle className="text-sm font-semibold">Recent Benchmark Runs</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -204,13 +172,13 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xs font-mono text-muted-foreground shrink-0">{run.id}</span>
                       <span className="text-sm truncate">
-                        {run.operatorNote || "Tidak ada catatan"}
+                        {run.operatorNote || "No note"}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <StatusBadge status={run.status} testId={`badge-run-status-${run.id}`} />
                       <span className="text-xs text-muted-foreground font-mono">
-                        {new Date(run.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}
+                        {new Date(run.createdAt).toLocaleDateString("en-US", { day: "2-digit", month: "short" })}
                       </span>
                     </div>
                   </div>
@@ -219,7 +187,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground py-4 text-center" data-testid="empty-recent-runs">
-              Belum ada benchmark run
+              No benchmark runs yet
             </p>
           )}
         </CardContent>

@@ -13,7 +13,7 @@ import { storage } from "./storage";
 const runUpdateSchema = insertRunSchema
   .partial()
   .refine((payload) => Object.keys(payload).length > 0, {
-    message: "Minimal satu field harus dikirim untuk update run",
+    message: "At least one field must be provided to update a run",
   });
 
 function validateBody<T>(schema: z.ZodType<T>, payload: unknown) {
@@ -22,7 +22,7 @@ function validateBody<T>(schema: z.ZodType<T>, payload: unknown) {
     return {
       ok: false as const,
       error: {
-        error: "Payload tidak valid",
+        error: "Invalid payload",
         details: parsed.error.flatten(),
       },
     };
@@ -48,7 +48,6 @@ export async function registerRoutes(
     });
   });
 
-  // ── Scenarios ──
   app.get("/api/scenarios", async (_req, res) => {
     const scenarios = await storage.getScenarios();
     res.json(scenarios);
@@ -56,7 +55,7 @@ export async function registerRoutes(
 
   app.get("/api/scenarios/:id", async (req, res) => {
     const scenario = await storage.getScenario(req.params.id);
-    if (!scenario) return res.status(404).json({ error: "Skenario tidak ditemukan" });
+    if (!scenario) return res.status(404).json({ error: "Scenario not found" });
     res.json(scenario);
   });
 
@@ -68,7 +67,6 @@ export async function registerRoutes(
     res.status(201).json(scenario);
   });
 
-  // ── Runs ──
   app.get("/api/runs", async (_req, res) => {
     const runs = await storage.getRuns();
     res.json(runs);
@@ -76,7 +74,7 @@ export async function registerRoutes(
 
   app.get("/api/runs/:id", async (req, res) => {
     const run = await storage.getRun(req.params.id);
-    if (!run) return res.status(404).json({ error: "Run tidak ditemukan" });
+    if (!run) return res.status(404).json({ error: "Run not found" });
     res.json(run);
   });
 
@@ -93,11 +91,10 @@ export async function registerRoutes(
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     const run = await storage.updateRun(req.params.id, parsed.data);
-    if (!run) return res.status(404).json({ error: "Run tidak ditemukan" });
+    if (!run) return res.status(404).json({ error: "Run not found" });
     res.json(run);
   });
 
-  // ── Safety Checks ──
   app.get("/api/safety-checks", async (_req, res) => {
     const checks = await storage.getSafetyChecks();
     res.json(checks);
@@ -105,7 +102,7 @@ export async function registerRoutes(
 
   app.get("/api/safety-checks/:id", async (req, res) => {
     const check = await storage.getSafetyCheck(req.params.id);
-    if (!check) return res.status(404).json({ error: "Safety check tidak ditemukan" });
+    if (!check) return res.status(404).json({ error: "Safety check not found" });
     res.json(check);
   });
 
@@ -118,7 +115,7 @@ export async function registerRoutes(
     if (runId) {
       const run = await storage.getRun(runId);
       if (!run) {
-        return res.status(400).json({ error: `Run dengan ID ${runId} tidak ditemukan` });
+        return res.status(400).json({ error: `Run with ID ${runId} was not found` });
       }
 
       await storage.updateRun(runId, {
@@ -135,7 +132,6 @@ export async function registerRoutes(
     res.status(201).json(check);
   });
 
-  // ── Lessons ──
   app.get("/api/lessons", async (_req, res) => {
     const lessons = await storage.getLessons();
     res.json(lessons);
@@ -143,7 +139,7 @@ export async function registerRoutes(
 
   app.get("/api/lessons/:id", async (req, res) => {
     const lesson = await storage.getLesson(req.params.id);
-    if (!lesson) return res.status(404).json({ error: "Lesson tidak ditemukan" });
+    if (!lesson) return res.status(404).json({ error: "Lesson not found" });
     res.json(lesson);
   });
 
@@ -155,7 +151,6 @@ export async function registerRoutes(
     res.status(201).json(lesson);
   });
 
-  // ── Reviews ──
   app.get("/api/reviews", async (_req, res) => {
     const reviews = await storage.getReviews();
     res.json(reviews);
@@ -163,7 +158,7 @@ export async function registerRoutes(
 
   app.get("/api/reviews/:id", async (req, res) => {
     const review = await storage.getReview(req.params.id);
-    if (!review) return res.status(404).json({ error: "Review tidak ditemukan" });
+    if (!review) return res.status(404).json({ error: "Review not found" });
     res.json(review);
   });
 
@@ -175,7 +170,6 @@ export async function registerRoutes(
     res.status(201).json(review);
   });
 
-  // ── Dashboard Stats ──
   app.get("/api/stats", async (_req, res) => {
     const [scenarios, runs, lessons, reviews, safetyChecks] = await Promise.all([
       storage.getScenarios(),

@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
-  { href: "/scenarios", label: "Katalog Skenario", icon: FlaskConical, testId: "nav-scenarios" },
+  { href: "/scenarios", label: "Scenario Catalog", icon: FlaskConical, testId: "nav-scenarios" },
   { href: "/runs", label: "Benchmark Runs", icon: Play, testId: "nav-runs" },
   { href: "/safety", label: "Safety Gate", icon: ShieldCheck, testId: "nav-safety" },
   { href: "/lessons", label: "Lessons Learned", icon: BookOpen, testId: "nav-lessons" },
@@ -98,7 +98,7 @@ export default function AppSidebar({ open, onClose }: { open: boolean; onClose: 
             data-testid="button-toggle-theme"
           >
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </Button>
           <div className="px-3 text-[10px] text-muted-foreground">
             <span className="font-mono">v0.1.0</span> · Public Prototype

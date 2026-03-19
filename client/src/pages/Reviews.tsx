@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,7 @@ export default function Reviews() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
       setShowForm(false);
       setForm({ taskGoal: "", finalResult: "", resultStatus: "", evidence: "", whatWorked: "", whatFailed: "", nearMiss: "", safestNextStep: "" });
-      toast({ title: "Berhasil", description: "Review berhasil disimpan" });
+      toast({ title: "Success", description: "Review saved successfully" });
     },
   });
 
@@ -58,7 +58,7 @@ export default function Reviews() {
       <div className="flex items-center justify-center h-64" data-testid="error-reviews">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat post-task reviews</p>
+          <p className="text-sm text-muted-foreground">Failed to load post-task reviews</p>
         </div>
       </div>
     );
@@ -72,62 +72,61 @@ export default function Reviews() {
             Post-Task Review
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Refleksi terstruktur setelah setiap task teknis penting
+            Structured reflection after each important technical task
           </p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)} data-testid="button-create-review">
           <Plus className="w-4 h-4 mr-1" />
-          Review Baru
+          New Review
         </Button>
       </div>
 
-      {/* Create form */}
       {showForm && (
         <Card className="bg-card border-card-border" data-testid="form-create-review">
           <CardContent className="p-4 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tujuan Task</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Task Goal</label>
                 <Input
                   value={form.taskGoal}
                   onChange={(e) => setForm({ ...form, taskGoal: e.target.value })}
-                  placeholder="Apa tujuan task ini..."
+                  placeholder="What was this task trying to accomplish..."
                   data-testid="input-task-goal"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Status Hasil</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Result Status</label>
                 <Select value={form.resultStatus} onValueChange={(v) => setForm({ ...form, resultStatus: v })}>
                   <SelectTrigger data-testid="select-result-status">
-                    <SelectValue placeholder="Pilih..." />
+                    <SelectValue placeholder="Choose..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="selesai">Selesai</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="partial">Partial</SelectItem>
-                    <SelectItem value="tertahan">Tertahan</SelectItem>
-                    <SelectItem value="gagal">Gagal</SelectItem>
+                    <SelectItem value="on-hold">On Hold</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Hasil Akhir</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Final Result</label>
               <Textarea
                 value={form.finalResult}
                 onChange={(e) => setForm({ ...form, finalResult: e.target.value })}
-                placeholder="Ringkasan hasil..."
+                placeholder="Summarize the outcome..."
                 className="resize-none"
                 data-testid="input-final-result"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Bukti Verifikasi</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Verification Evidence</label>
               <Textarea
                 value={form.evidence}
                 onChange={(e) => setForm({ ...form, evidence: e.target.value })}
-                placeholder="Command, log, output..."
+                placeholder="Commands, logs, outputs..."
                 className="resize-none font-mono text-xs"
                 data-testid="input-evidence"
               />
@@ -135,7 +134,7 @@ export default function Reviews() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Apa yang Berhasil</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">What Worked</label>
                 <Textarea
                   value={form.whatWorked}
                   onChange={(e) => setForm({ ...form, whatWorked: e.target.value })}
@@ -144,7 +143,7 @@ export default function Reviews() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Apa yang Gagal</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">What Failed</label>
                 <Textarea
                   value={form.whatFailed}
                   onChange={(e) => setForm({ ...form, whatFailed: e.target.value })}
@@ -155,7 +154,7 @@ export default function Reviews() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Apa yang Hampir Salah</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Near-Miss</label>
               <Textarea
                 value={form.nearMiss}
                 onChange={(e) => setForm({ ...form, nearMiss: e.target.value })}
@@ -165,7 +164,7 @@ export default function Reviews() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Langkah Lanjut Paling Aman</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Safest Next Step</label>
               <Input
                 value={form.safestNextStep}
                 onChange={(e) => setForm({ ...form, safestNextStep: e.target.value })}
@@ -179,13 +178,12 @@ export default function Reviews() {
               onClick={() => createMutation.mutate()}
               data-testid="button-submit-review"
             >
-              {createMutation.isPending ? "Menyimpan..." : "Simpan Review"}
+              {createMutation.isPending ? "Saving..." : "Save Review"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* List */}
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -219,7 +217,7 @@ export default function Reviews() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground font-mono">
-                        {new Date(review.createdAt).toLocaleDateString("id-ID")}
+                        {new Date(review.createdAt).toLocaleDateString("en-US")}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -232,29 +230,29 @@ export default function Reviews() {
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-border space-y-3 text-sm">
                       <div>
-                        <span className="text-xs font-medium text-muted-foreground">Hasil Akhir</span>
+                        <span className="text-xs font-medium text-muted-foreground">Final Result</span>
                         <p className="mt-0.5">{review.finalResult}</p>
                       </div>
                       <div>
-                        <span className="text-xs font-medium text-muted-foreground">Bukti Verifikasi</span>
+                        <span className="text-xs font-medium text-muted-foreground">Verification Evidence</span>
                         <p className="mt-0.5 font-mono text-xs">{review.evidence}</p>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <span className="text-xs font-medium text-emerald-400">✓ Apa yang Berhasil</span>
+                          <span className="text-xs font-medium text-emerald-400">✓ What Worked</span>
                           <p className="mt-0.5">{review.whatWorked}</p>
                         </div>
                         <div>
-                          <span className="text-xs font-medium text-red-400">✗ Apa yang Gagal</span>
+                          <span className="text-xs font-medium text-red-400">✗ What Failed</span>
                           <p className="mt-0.5">{review.whatFailed}</p>
                         </div>
                       </div>
                       <div>
-                        <span className="text-xs font-medium text-amber-400">⚠ Hampir Salah</span>
+                        <span className="text-xs font-medium text-amber-400">⚠ Near-Miss</span>
                         <p className="mt-0.5">{review.nearMiss}</p>
                       </div>
                       <div>
-                        <span className="text-xs font-medium text-primary">→ Langkah Lanjut Paling Aman</span>
+                        <span className="text-xs font-medium text-primary">→ Safest Next Step</span>
                         <p className="mt-0.5 font-medium">{review.safestNextStep}</p>
                       </div>
                     </div>
@@ -267,7 +265,7 @@ export default function Reviews() {
       ) : (
         <div className="text-center py-12" data-testid="empty-reviews">
           <ClipboardCheck className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Belum ada post-task review</p>
+          <p className="text-sm text-muted-foreground">No post-task reviews yet</p>
         </div>
       )}
     </div>

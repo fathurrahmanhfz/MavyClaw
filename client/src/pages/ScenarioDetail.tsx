@@ -31,7 +31,7 @@ export default function ScenarioDetail() {
       <div className="flex items-center justify-center h-64" data-testid="error-scenario-detail">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Skenario tidak ditemukan</p>
+          <p className="text-sm text-muted-foreground">Scenario not found</p>
         </div>
       </div>
     );
@@ -55,11 +55,10 @@ export default function ScenarioDetail() {
 
   return (
     <div className="space-y-6" data-testid="page-scenario-detail">
-      {/* Back + Title */}
       <div>
         <Link href="/scenarios">
           <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground" data-testid="button-back-scenarios">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back
           </Button>
         </Link>
         <h2 className="text-xl font-bold tracking-tight" data-testid="heading-scenario-title">
@@ -73,53 +72,20 @@ export default function ScenarioDetail() {
         </div>
       </div>
 
-      {/* Detail Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DetailCard
-          icon={Target}
-          title="Objective"
-          content={scenario.objective}
-          testId="card-objective"
-        />
-        <DetailCard
-          icon={CheckCircle}
-          title="Acceptance Criteria"
-          content={scenario.acceptanceCriteria}
-          testId="card-acceptance"
-        />
-        <DetailCard
-          icon={ShieldAlert}
-          title="Langkah Aman Wajib"
-          content={scenario.safeSteps}
-          testId="card-safe-steps"
-          mono
-        />
-        <DetailCard
-          icon={XCircle}
-          title="Anti-Pattern"
-          content={scenario.antiPatterns}
-          testId="card-anti-patterns"
-        />
-        <DetailCard
-          icon={ClipboardList}
-          title="Checklist Verifikasi"
-          content={scenario.verificationChecklist}
-          testId="card-verification"
-        />
-        <DetailCard
-          icon={AlertTriangle}
-          title="Risiko Utama"
-          content={scenario.primaryRisk}
-          testId="card-risk"
-        />
+        <DetailCard icon={Target} title="Objective" content={scenario.objective} testId="card-objective" />
+        <DetailCard icon={CheckCircle} title="Acceptance Criteria" content={scenario.acceptanceCriteria} testId="card-acceptance" />
+        <DetailCard icon={ShieldAlert} title="Required Safe Steps" content={scenario.safeSteps} testId="card-safe-steps" mono />
+        <DetailCard icon={XCircle} title="Anti-Patterns" content={scenario.antiPatterns} testId="card-anti-patterns" />
+        <DetailCard icon={ClipboardList} title="Verification Checklist" content={scenario.verificationChecklist} testId="card-verification" />
+        <DetailCard icon={AlertTriangle} title="Primary Risk" content={scenario.primaryRisk} testId="card-risk" />
       </div>
 
-      {/* Evidence Target */}
       <Card className="bg-card border-card-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Target className="w-4 h-4 text-primary" />
-            Target Bukti Verifikasi
+            Target Verification Evidence
           </CardTitle>
         </CardHeader>
         <CardContent>

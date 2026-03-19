@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,7 @@ export default function SafetyGate() {
       queryClient.invalidateQueries({ queryKey: ["/api/runs"] });
       setShowForm(false);
       setForm({ runId: "", targetEnv: "", actionMode: "", affectedAssets: "", minVerification: "", recoveryPath: "", decision: "", reason: "" });
-      toast({ title: "Berhasil", description: "Safety check berhasil disimpan" });
+      toast({ title: "Success", description: "Safety check saved successfully" });
     },
   });
 
@@ -67,7 +67,7 @@ export default function SafetyGate() {
       <div className="flex items-center justify-center h-64" data-testid="error-safety">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat safety checks</p>
+          <p className="text-sm text-muted-foreground">Failed to load safety checks</p>
         </div>
       </div>
     );
@@ -81,27 +81,25 @@ export default function SafetyGate() {
             Safety Gate Center
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Evaluasi risiko sebelum tindakan berisiko
+            Evaluate risk before higher-impact actions
           </p>
         </div>
         <Button size="sm" onClick={() => setShowForm(!showForm)} data-testid="button-create-safety">
           <Plus className="w-4 h-4 mr-1" />
-          Safety Check Baru
+          New Safety Check
         </Button>
       </div>
 
-      {/* Create form */}
       {showForm && (
         <Card className="bg-card border-card-border" data-testid="form-create-safety">
           <CardContent className="p-4 space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Run Terkait (Opsional)</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Related Run (Optional)</label>
               <Select value={form.runId} onValueChange={(v) => setForm({ ...form, runId: v })}>
                 <SelectTrigger data-testid="select-run-id">
-                  <SelectValue placeholder="Pilih run..." />
+                  <SelectValue placeholder="Choose a run..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tidak ada</SelectItem>
                   {runs?.map((run) => (
                     <SelectItem key={run.id} value={run.id}>
                       {run.id} ({run.status})
@@ -116,10 +114,10 @@ export default function SafetyGate() {
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Target Environment</label>
                 <Select value={form.targetEnv} onValueChange={(v) => setForm({ ...form, targetEnv: v })}>
                   <SelectTrigger data-testid="select-target-env">
-                    <SelectValue placeholder="Pilih..." />
+                    <SelectValue placeholder="Choose..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="produksi">Produksi</SelectItem>
+                    <SelectItem value="production">Production</SelectItem>
                     <SelectItem value="staging">Staging</SelectItem>
                     <SelectItem value="dev">Dev</SelectItem>
                     <SelectItem value="sandbox">Sandbox</SelectItem>
@@ -127,10 +125,10 @@ export default function SafetyGate() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Mode Aksi</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Action Mode</label>
                 <Select value={form.actionMode} onValueChange={(v) => setForm({ ...form, actionMode: v })}>
                   <SelectTrigger data-testid="select-action-mode">
-                    <SelectValue placeholder="Pilih..." />
+                    <SelectValue placeholder="Choose..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="read-only">Read-Only</SelectItem>
@@ -141,21 +139,21 @@ export default function SafetyGate() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Aset Terdampak</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Affected Assets</label>
               <Input
                 value={form.affectedAssets}
                 onChange={(e) => setForm({ ...form, affectedAssets: e.target.value })}
-                placeholder="Contoh: Database users, Nginx config..."
+                placeholder="Example: users database, Nginx config..."
                 data-testid="input-affected-assets"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Verifikasi Minimum</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Minimum Verification</label>
               <Textarea
                 value={form.minVerification}
                 onChange={(e) => setForm({ ...form, minVerification: e.target.value })}
-                placeholder="Apa yang harus dicek sebelum aksi..."
+                placeholder="What must be checked before acting..."
                 className="resize-none"
                 data-testid="input-min-verification"
               />
@@ -166,7 +164,7 @@ export default function SafetyGate() {
               <Textarea
                 value={form.recoveryPath}
                 onChange={(e) => setForm({ ...form, recoveryPath: e.target.value })}
-                placeholder="Cara rollback jika gagal..."
+                placeholder="How to roll back if something fails..."
                 className="resize-none"
                 data-testid="input-recovery-path"
               />
@@ -174,10 +172,10 @@ export default function SafetyGate() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Keputusan Gate</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Gate Decision</label>
                 <Select value={form.decision} onValueChange={(v) => setForm({ ...form, decision: v })}>
                   <SelectTrigger data-testid="select-decision">
-                    <SelectValue placeholder="Pilih..." />
+                    <SelectValue placeholder="Choose..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="allow-read-only">Allow Read-Only</SelectItem>
@@ -188,11 +186,11 @@ export default function SafetyGate() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Alasan</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Reason</label>
                 <Input
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  placeholder="Alasan keputusan..."
+                  placeholder="Decision rationale..."
                   data-testid="input-reason"
                 />
               </div>
@@ -204,13 +202,12 @@ export default function SafetyGate() {
               onClick={() => createMutation.mutate()}
               data-testid="button-submit-safety"
             >
-              {createMutation.isPending ? "Menyimpan..." : "Simpan Safety Check"}
+              {createMutation.isPending ? "Saving..." : "Save Safety Check"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* List */}
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -231,7 +228,7 @@ export default function SafetyGate() {
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground font-mono">
-                    {new Date(check.createdAt).toLocaleDateString("id-ID")}
+                    {new Date(check.createdAt).toLocaleDateString("en-US")}
                   </span>
                 </div>
 
@@ -243,7 +240,7 @@ export default function SafetyGate() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-xs text-muted-foreground font-medium">Aset Terdampak</span>
+                    <span className="text-xs text-muted-foreground font-medium">Affected Assets</span>
                     <p className="mt-0.5">{check.affectedAssets}</p>
                   </div>
                   <div>
@@ -253,7 +250,7 @@ export default function SafetyGate() {
                 </div>
 
                 <div>
-                  <span className="text-xs text-muted-foreground font-medium">Alasan</span>
+                  <span className="text-xs text-muted-foreground font-medium">Reason</span>
                   <p className="text-sm mt-0.5">{check.reason}</p>
                 </div>
               </CardContent>
@@ -263,7 +260,7 @@ export default function SafetyGate() {
       ) : (
         <div className="text-center py-12" data-testid="empty-safety">
           <ShieldCheck className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Belum ada safety check</p>
+          <p className="text-sm text-muted-foreground">No safety checks yet</p>
         </div>
       )}
     </div>

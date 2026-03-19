@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,7 +53,7 @@ export default function Runs() {
       setShowCreate(false);
       setNewScenarioId("");
       setNewNote("");
-      toast({ title: "Berhasil", description: "Run baru berhasil dibuat" });
+      toast({ title: "Success", description: "New run created successfully" });
     },
   });
 
@@ -65,7 +65,7 @@ export default function Runs() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/runs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Berhasil", description: "Status run diperbarui" });
+      toast({ title: "Success", description: "Run status updated" });
     },
   });
 
@@ -76,7 +76,7 @@ export default function Runs() {
       <div className="flex items-center justify-center h-64" data-testid="error-runs">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat benchmark runs</p>
+          <p className="text-sm text-muted-foreground">Failed to load benchmark runs</p>
         </div>
       </div>
     );
@@ -90,7 +90,7 @@ export default function Runs() {
             Benchmark Runs
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Kelola dan pantau eksekusi benchmark
+            Manage and monitor benchmark execution
           </p>
         </div>
         <Button
@@ -99,19 +99,18 @@ export default function Runs() {
           data-testid="button-create-run"
         >
           <Plus className="w-4 h-4 mr-1" />
-          Buat Run
+          Create Run
         </Button>
       </div>
 
-      {/* Create form */}
       {showCreate && (
         <Card className="bg-card border-card-border" data-testid="form-create-run">
           <CardContent className="p-4 space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Skenario</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Scenario</label>
               <Select value={newScenarioId} onValueChange={setNewScenarioId}>
                 <SelectTrigger data-testid="select-scenario">
-                  <SelectValue placeholder="Pilih skenario..." />
+                  <SelectValue placeholder="Choose a scenario..." />
                 </SelectTrigger>
                 <SelectContent>
                   {(scenarios || []).map((sc) => (
@@ -123,11 +122,11 @@ export default function Runs() {
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Catatan Operator</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Operator Note</label>
               <Textarea
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Catatan opsional..."
+                placeholder="Optional operator note..."
                 className="resize-none"
                 data-testid="input-operator-note"
               />
@@ -138,13 +137,12 @@ export default function Runs() {
               onClick={() => createMutation.mutate()}
               data-testid="button-submit-run"
             >
-              {createMutation.isPending ? "Membuat..." : "Buat Run Baru"}
+              {createMutation.isPending ? "Creating..." : "Create New Run"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Run list */}
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -177,7 +175,7 @@ export default function Runs() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground font-mono">
-                        {new Date(run.createdAt).toLocaleDateString("id-ID")}
+                        {new Date(run.createdAt).toLocaleDateString("en-US")}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -191,26 +189,25 @@ export default function Runs() {
                     <div className="mt-4 pt-4 border-t border-border space-y-3">
                       {run.operatorNote && (
                         <div>
-                          <span className="text-xs font-medium text-muted-foreground">Catatan Operator</span>
+                          <span className="text-xs font-medium text-muted-foreground">Operator Note</span>
                           <p className="text-sm mt-1" data-testid={`text-note-${run.id}`}>{run.operatorNote}</p>
                         </div>
                       )}
                       {run.evidence && (
                         <div>
-                          <span className="text-xs font-medium text-muted-foreground">Bukti Verifikasi</span>
+                          <span className="text-xs font-medium text-muted-foreground">Verification Evidence</span>
                           <p className="text-sm font-mono mt-1" data-testid={`text-evidence-${run.id}`}>{run.evidence}</p>
                         </div>
                       )}
                       {run.safetyDecision && (
                         <div>
-                          <span className="text-xs font-medium text-muted-foreground">Keputusan Safety</span>
+                          <span className="text-xs font-medium text-muted-foreground">Safety Decision</span>
                           <div className="mt-1">
                             <StatusBadge status={run.safetyDecision} testId={`badge-safety-${run.id}`} />
                           </div>
                         </div>
                       )}
 
-                      {/* Quick status update */}
                       <div className="flex flex-wrap gap-2 pt-2">
                         {["planned", "running", "blocked", "passed", "failed"].map((s) => (
                           <Button
@@ -236,7 +233,7 @@ export default function Runs() {
       ) : (
         <div className="text-center py-12" data-testid="empty-runs">
           <Play className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Belum ada benchmark run</p>
+          <p className="text-sm text-muted-foreground">No benchmark runs yet</p>
         </div>
       )}
     </div>

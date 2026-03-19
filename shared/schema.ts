@@ -44,7 +44,7 @@ export type Run = typeof runs.$inferSelect;
 export const safetyChecks = pgTable("safety_checks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   runId: varchar("run_id"),
-  targetEnv: text("target_env").notNull(), // produksi | staging | dev | sandbox
+  targetEnv: text("target_env").notNull(), // production | staging | dev | sandbox
   actionMode: text("action_mode").notNull(), // read-only | write
   affectedAssets: text("affected_assets").notNull(),
   minVerification: text("min_verification").notNull(),
@@ -84,7 +84,7 @@ export const reviews = pgTable("reviews", {
   runId: varchar("run_id"),
   taskGoal: text("task_goal").notNull(),
   finalResult: text("final_result").notNull(),
-  resultStatus: text("result_status").notNull(), // selesai | partial | tertahan | gagal
+  resultStatus: text("result_status").notNull(), // completed | partial | on-hold | failed
   evidence: text("evidence").notNull(),
   whatWorked: text("what_worked").notNull(),
   whatFailed: text("what_failed").notNull(),

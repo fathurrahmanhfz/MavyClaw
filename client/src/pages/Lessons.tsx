@@ -23,7 +23,7 @@ export default function Lessons() {
       <div className="flex items-center justify-center h-64" data-testid="error-lessons">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat data kegagalan dan pelajaran</p>
+          <p className="text-sm text-muted-foreground">Failed to load failure logs and lessons</p>
         </div>
       </div>
     );
@@ -33,10 +33,10 @@ export default function Lessons() {
     <div className="space-y-6" data-testid="page-lessons">
       <div>
         <h2 className="text-xl font-bold tracking-tight" data-testid="heading-lessons">
-          Kegagalan & Pelajaran
+          Failures & Lessons
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Catatan kegagalan, near-miss, dan pelajaran yang lahir dari setiap task
+          Failure notes, near-misses, and lessons captured from operational work
         </p>
       </div>
 
@@ -53,7 +53,6 @@ export default function Lessons() {
             return (
               <Card key={lesson.id} className="bg-card border-card-border" data-testid={`card-lesson-${lesson.id}`}>
                 <CardContent className="p-4">
-                  {/* Header row */}
                   <div
                     className="flex items-start justify-between gap-4 cursor-pointer"
                     onClick={() => setExpandedId(isExpanded ? null : lesson.id)}
@@ -78,7 +77,7 @@ export default function Lessons() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground font-mono">
-                        {new Date(lesson.createdAt).toLocaleDateString("id-ID")}
+                        {new Date(lesson.createdAt).toLocaleDateString("en-US")}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -88,14 +87,13 @@ export default function Lessons() {
                     </div>
                   </div>
 
-                  {/* Expanded detail */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-border space-y-3 text-sm">
-                      <DetailRow label="Konteks" value={lesson.context} />
-                      <DetailRow label="Gejala" value={lesson.symptom} />
-                      <DetailRow label="Akar Masalah" value={lesson.rootCause} />
-                      <DetailRow label="Dampak" value={lesson.impact} />
-                      <DetailRow label="Pencegahan" value={lesson.prevention} highlight />
+                      <DetailRow label="Context" value={lesson.context} />
+                      <DetailRow label="Symptom" value={lesson.symptom} />
+                      <DetailRow label="Root Cause" value={lesson.rootCause} />
+                      <DetailRow label="Impact" value={lesson.impact} />
+                      <DetailRow label="Prevention" value={lesson.prevention} highlight />
                     </div>
                   )}
                 </CardContent>
@@ -106,7 +104,7 @@ export default function Lessons() {
       ) : (
         <div className="text-center py-12" data-testid="empty-lessons">
           <BookOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Belum ada pelajaran tercatat</p>
+          <p className="text-sm text-muted-foreground">No lessons recorded yet</p>
         </div>
       )}
     </div>

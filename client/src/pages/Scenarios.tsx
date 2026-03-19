@@ -21,7 +21,7 @@ export default function Scenarios() {
       <div className="flex items-center justify-center h-64" data-testid="error-scenarios">
         <div className="text-center">
           <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Gagal memuat skenario</p>
+          <p className="text-sm text-muted-foreground">Failed to load scenarios</p>
         </div>
       </div>
     );
@@ -31,10 +31,10 @@ export default function Scenarios() {
     <div className="space-y-6" data-testid="page-scenarios">
       <div>
         <h2 className="text-xl font-bold tracking-tight" data-testid="heading-scenarios">
-          Katalog Skenario
+          Scenario Catalog
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Daftar skenario benchmark realistis untuk agent ops
+          A set of realistic benchmark scenarios for agent operations teams
         </p>
       </div>
 
@@ -80,7 +80,7 @@ export default function Scenarios() {
       ) : (
         <div className="text-center py-12" data-testid="empty-scenarios">
           <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Belum ada skenario benchmark</p>
+          <p className="text-sm text-muted-foreground">No benchmark scenarios yet</p>
         </div>
       )}
     </div>
