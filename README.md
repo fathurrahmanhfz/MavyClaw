@@ -1,53 +1,90 @@
 # MavyClaw
 
-MavyClaw adalah workspace operasi benchmark untuk tim agent AI yang ingin mengelola skenario, run, safety check, lesson learned, review, dan ringkasan operasional dalam satu aplikasi.
+MavyClaw adalah workspace benchmark ops untuk tim agent AI yang butuh cara kerja lebih rapi daripada sekadar chat, spreadsheet, dan catatan acak.
 
-## Status saat ini
+Kalau tim Anda menjalankan benchmark agent, menilai hasil run, memikirkan safety sebelum aksi berisiko, lalu ingin menyimpan lesson learned dan review secara konsisten, MavyClaw memberi titik awal yang sudah konkret.
 
-Repo publik ini sudah berada di level prototype yang rapi dan bisa dijalankan. UI, API, seeded sample data, dan alur kerja inti sudah berfungsi untuk demo, evaluasi produk, dan pengembangan lanjutan.
+## Kenapa repo ini layak dipasang
 
-Snapshot publik saat ini belum memakai persistence database aktif sebagai default runtime. Schema Drizzle dan konfigurasi PostgreSQL sudah disertakan sebagai fondasi, tetapi runtime publik yang ada sekarang masih memakai seeded in-memory storage.
+Masalah yang sering terjadi di tim agent ops biasanya sama:
+- skenario benchmark tersebar di mana-mana
+- hasil run tidak tercatat dengan rapi
+- keputusan safety hanya hidup di chat
+- pelajaran dari kegagalan hilang setelah task selesai
+- review akhir tidak punya format yang konsisten
+- dashboard operasional tidak ada atau terlambat dibuat
 
-## Kenapa orang perlu memasang repo ini
+MavyClaw menyatukan semua itu dalam satu aplikasi ringan yang sudah punya alur kerja nyata.
 
-MavyClaw berguna kalau tim butuh titik awal yang sudah jadi untuk:
-- menyusun katalog skenario benchmark
-- mencatat dan memantau benchmark runs
-- menjalankan safety gate sebelum aksi berisiko
-- menyimpan lesson learned dari kegagalan dan near-miss
-- mendokumentasikan post-task review
-- melihat ringkasan operasional dari dashboard
+Jadi alasan orang memasang repo ini bukan karena ingin aplikasi demo biasa, tetapi karena ingin fondasi yang sudah jadi untuk benchmark operations workspace internal.
 
-Alasan utama memasangnya bukan karena ia sudah menjadi platform benchmark paling lengkap, tetapi karena repo ini sudah memberi kerangka kerja operasional yang konkret, cepat dipahami, dan mudah dikembangkan untuk use case agent ops internal.
+## Apa yang sudah ada
+
+Repo publik ini sudah berisi aplikasi full-stack yang bisa dijalankan dan langsung menunjukkan alur kerja inti MavyClaw.
+
+Fitur utama yang sudah ada:
+- katalog skenario benchmark
+- benchmark runs dengan status dan catatan operator
+- safety gate untuk evaluasi risiko sebelum aksi
+- lessons learned untuk kegagalan dan near-miss
+- post-task review yang terstruktur
+- dashboard untuk ringkasan operasional
+- health endpoint untuk verifikasi runtime
+- validasi payload dasar di API
+- CI publik untuk typecheck dan build
+
+## Cara kerja MavyClaw
+
+Alur kerja yang didukung MavyClaw:
+1. Susun skenario benchmark yang realistis.
+2. Jalankan benchmark run terhadap skenario yang dipilih.
+3. Catat status run, evidence, dan operator note.
+4. Lakukan safety gate sebelum tindakan yang berisiko.
+5. Simpan lesson learned dari kegagalan atau near-miss.
+6. Tutup pekerjaan dengan post-task review.
+7. Pantau ringkasannya dari dashboard.
+
+## Cocok untuk siapa
+
+MavyClaw paling cocok untuk:
+- tim AI agent ops
+- tim evaluasi agent
+- internal tooling team
+- engineering manager yang butuh benchmark evidence lebih rapi
+- tim yang ingin membangun workflow agent yang lebih aman dan bisa diaudit
+
+Kalau yang dicari adalah platform enterprise yang sudah lengkap dengan auth, multi-user, dan persistence production-ready, repo ini belum di level itu.
+
+## Kenapa ini lebih berguna daripada mulai dari nol
+
+Mulai dari nol kelihatannya mudah, tapi biasanya berakhir dengan:
+- schema data yang tidak konsisten
+- istilah dan status yang berubah-ubah
+- safety review yang tidak pernah benar-benar dibakukan
+- lesson learned yang tidak pernah dipakai ulang
+- dashboard yang baru dibuat belakangan setelah data sudah berantakan
+
+MavyClaw memberi struktur awal yang langsung bisa dipakai, lalu dikembangkan sesuai proses tim masing-masing.
 
 ## Fitur
 
 ### Scenario catalog
-Kelola skenario benchmark dengan informasi seperti judul, deskripsi, kategori, tingkat kesulitan, readiness, objective, acceptance criteria, safe steps, dan verification checklist.
+Kelola skenario benchmark dengan field yang memang berguna untuk operasi nyata, seperti kategori, tingkat kesulitan, readiness, objective, acceptance criteria, safe steps, anti-pattern, dan verification checklist.
 
 ### Benchmark runs
-Buat run baru, ubah status run, simpan catatan operator, dan lacak hasil eksekusi benchmark.
+Buat run baru, ubah status, simpan operator note, catat evidence, dan lacak perkembangan benchmark dari planned sampai passed atau failed.
 
 ### Safety gate
-Catat evaluasi risiko sebelum tindakan penting, termasuk target environment, mode aksi, aset terdampak, recovery path, verifikasi minimum, dan keputusan gate.
+Evaluasi target environment, mode aksi, aset terdampak, recovery path, verifikasi minimum, dan keputusan gate sebelum langkah berisiko dilakukan.
 
 ### Lessons learned
-Simpan pelajaran dari kegagalan, gejala, akar masalah, dampak, dan langkah pencegahan.
+Simpan konteks kegagalan, gejala, akar masalah, dampak, pencegahan, dan tingkat promosi pembelajaran agar pengetahuan operasional tidak hilang.
 
 ### Post-task review
-Dokumentasikan hasil akhir task, bukti verifikasi, hal yang berhasil, hal yang gagal, near-miss, dan langkah lanjut paling aman.
+Simpan hasil akhir task, bukti verifikasi, apa yang berhasil, apa yang gagal, near-miss, dan langkah lanjut paling aman.
 
 ### Dashboard
-Lihat ringkasan skenario, run, lesson, review, safety check, distribusi status, kategori error, dan benchmark terbaru.
-
-## Batasan saat ini
-
-Batasan yang masih ada di snapshot publik ini:
-- persistence database belum aktif sebagai runtime default
-- automated test suite belum tersedia
-- workflow CI publik belum tersedia
-- autentikasi dan multi-user belum tersedia
-- ini lebih cocok sebagai internal tool starter daripada produk siap produksi
+Lihat total skenario, run, lesson, review, safety check, distribusi status, kategori error, dan benchmark terbaru dalam satu tampilan.
 
 ## Stack
 
@@ -77,7 +114,7 @@ Batasan yang masih ada di snapshot publik ini:
 ### Setup
 1. Clone repository.
 2. Jalankan `npm install`.
-3. Salin `.env.example` menjadi `.env` jika ingin menyesuaikan port atau menyiapkan fondasi database.
+3. Salin `.env.example` menjadi `.env` bila ingin menyesuaikan konfigurasi lokal.
 4. Jalankan `npm run dev`.
 
 ### Build
@@ -88,11 +125,12 @@ npm run start
 
 ## Environment
 
-Environment variable minimum untuk menjalankan app lokal:
-- `PORT` opsional
-- `NODE_ENV` opsional
+Environment variable yang bisa dipakai:
+- `PORT`
+- `NODE_ENV`
+- `DATABASE_URL`
 
-`DATABASE_URL` belum wajib untuk snapshot publik saat ini, tetapi tetap disertakan untuk pengembangan lanjutan berbasis Drizzle dan PostgreSQL.
+Saat ini snapshot publik tetap bisa dijalankan tanpa database aktif karena runtime default masih memakai seeded in-memory storage. `DATABASE_URL` sudah disiapkan sebagai fondasi untuk pengembangan persistence berikutnya.
 
 Contoh:
 ```env
@@ -101,9 +139,23 @@ PORT=5000
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 ```
 
+## Status repo saat ini
+
+Posisi repo publik ini sekarang adalah public prototype yang rapi dan layak dipakai untuk:
+- evaluasi produk
+- demo internal
+- fondasi internal tool
+- basis pengembangan lanjutan
+
+Yang belum ada saat ini:
+- persistence database aktif sebagai runtime default
+- auth dan multi-user
+- test suite yang lebih lengkap dari quality gate dasar
+- fitur production-grade penuh
+
 ## Catatan keamanan
 
-Jangan jalankan perubahan database ke environment production tanpa verifikasi dan persetujuan yang jelas.
+Jangan arahkan eksperimen database atau perubahan berisiko ke environment production tanpa verifikasi dan persetujuan yang jelas.
 
 ## License
 
