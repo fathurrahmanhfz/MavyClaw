@@ -22,6 +22,7 @@
     "smoke:prod": "SMOKE_MODE=prod-file node script/smoke-test.mjs",
     "smoke:postgres": "SMOKE_MODE=prod-postgres node script/smoke-test.mjs",
     "verify:deploy": "bash deploy/verify-deployment.sh",
+    "bootstrap:vps": "bash deploy/bootstrap-vps.sh",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

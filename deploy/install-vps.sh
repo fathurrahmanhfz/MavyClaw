@@ -211,8 +211,9 @@ Notes:
 - This helper expects a Debian or Ubuntu style host with systemd.
 
 Next steps:
-- Register Nginx: deploy/register-nginx.sh
-- Register Caddy: deploy/register-caddy.sh
+- Preferred default for remote access: deploy/bootstrap-vps.sh
+- Register Nginx manually: deploy/register-nginx.sh
+- Register Caddy manually: deploy/register-caddy.sh
 - Or use Cloudflare Tunnel with deploy/cloudflare/cloudflared-config.example.yml
 EOF
 }

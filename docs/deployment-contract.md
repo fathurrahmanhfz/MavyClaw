@@ -66,6 +66,16 @@ Expected runtime outcomes:
 - postgres mode: `runtime: postgres` and `persistence: database`
 - memory mode is acceptable only for local development, not production-style deployment
 
+## Default bootstrap path
+
+When the operator wants remote browser access and does not provide a stronger preference, agents should default to:
+
+```bash
+sudo PUBLIC_PORT=3005 SESSION_SECRET_VALUE=<strong-secret> DEMO_AUTH_PASSWORD_VALUE=<strong-password> bash deploy/bootstrap-vps.sh
+```
+
+This path keeps the app on an internal bind, publishes it through Nginx on a separate public port, runs the relevant smoke test, verifies local runtime honesty, and prints the final URL summary.
+
 ## Minimum install sequence
 
 An agent should follow this order:
@@ -184,7 +194,10 @@ A successful deployment report should include:
 Agents should consult these repository files:
 
 - `README.md`
+- `AGENTS.md`
 - `docs/agent-setup-playbook.md`
+- `deploy/bootstrap-vps.sh`
+- `deploy/publish-public-nginx.sh`
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`

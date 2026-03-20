@@ -46,6 +46,24 @@ MavyClaw gives you a baseline that already includes product structure, runtime v
 
 ## Quick start
 
+### One-command VPS bootstrap
+
+For the default remote-access path that avoids the raw app port and publishes through Nginx on a separate public port, use:
+
+```bash
+sudo PUBLIC_PORT=3005 SESSION_SECRET_VALUE=<strong-secret> DEMO_AUTH_PASSWORD_VALUE=<strong-password> bash deploy/bootstrap-vps.sh
+```
+
+What this default path does:
+
+- installs MavyClaw on the VPS
+- keeps the app internal on `127.0.0.1:5000`
+- runs the relevant smoke test before claiming success
+- publishes the app through Nginx on a separate public port
+- prints the final local and public URLs plus auth summary
+
+If a provider firewall or security group still blocks the chosen public port, open that port on the VPS provider side after bootstrap.
+
 ### Requirements
 
 - Node.js 20+
@@ -171,6 +189,9 @@ Reference documents and helpers:
 
 - [Deployment contract](docs/deployment-contract.md)
 - [Agent setup playbook](docs/agent-setup-playbook.md)
+- `AGENTS.md`
+- `deploy/bootstrap-vps.sh`
+- `deploy/publish-public-nginx.sh`
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`

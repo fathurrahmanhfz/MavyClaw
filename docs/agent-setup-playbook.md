@@ -5,7 +5,10 @@ Use this playbook when an AI agent needs to install, verify, and publish MavyCla
 Read this together with:
 
 - `README.md`
+- `AGENTS.md`
 - `docs/deployment-contract.md`
+- `deploy/bootstrap-vps.sh`
+- `deploy/publish-public-nginx.sh`
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
@@ -55,6 +58,16 @@ If no stronger requirement exists, use this path:
 
 ## Fastest safe setup paths
 
+### Default VPS bootstrap for remote access
+
+Use this first when the user wants the app reachable from another browser or device and gives no stronger preference:
+
+```bash
+sudo PUBLIC_PORT=3005 SESSION_SECRET_VALUE=<strong-secret> DEMO_AUTH_PASSWORD_VALUE=<strong-password> bash deploy/bootstrap-vps.sh
+```
+
+This path installs the app, keeps it internal on `127.0.0.1:5000`, runs the relevant smoke test, publishes it through Nginx on a separate public port, and prints the final URL summary.
+
 ### Local development
 
 ```bash
@@ -93,7 +106,7 @@ npm run start
 
 ## Automated VPS helper
 
-For Debian or Ubuntu style hosts with `apt-get` and `systemd`, the install helper can bootstrap a baseline setup:
+For Debian or Ubuntu style hosts with `apt-get` and `systemd`, the lower-level install helper can bootstrap the app itself, but `deploy/bootstrap-vps.sh` is now the preferred default when remote access is required:
 
 ```bash
 sudo APP_DIR=/opt/mavyclaw \
