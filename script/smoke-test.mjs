@@ -651,11 +651,15 @@ async function run() {
       assert(loginAfterRestart.response.ok, `Re-login after restart failed: ${loginAfterRestart.text}`);
 
       const statsAfterRestart = await fetchJson("/api/stats");
-      assert(statsAfterRestart.body.totalRuns === 1, `${mode} import state did not survive restart`);
+      // After import the snapshot has 1 run and 1 lesson. Before restart, the smoke
+      // test adds 2 more runs (approvalRun + rejectRun), so the persisted state has 3
+      // runs total. Lessons remain at 1 (no new lessons are created after import).
+      assert(statsAfterRestart.body.totalRuns === 3, `${mode} import state did not survive restart`);
       assert(statsAfterRestart.body.totalLessons === 1, `${mode} imported lesson state did not survive restart`);
 
       const runs = await fetchJson("/api/runs");
-      const created = runs.body.find((item) => item.operatorNote === payload.operatorNote);
+      // The imported run's operatorNote was changed by the cancel step, so match by id.
+      const created = runs.body.find((item) => item.id === createRun.body.id);
       assert(Boolean(created), "Created run was not found after restart");
     }
 
