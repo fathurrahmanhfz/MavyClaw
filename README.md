@@ -223,27 +223,27 @@ MavyClaw gives you a ready-made structure that you can run, inspect, and extend 
 
 ## Repository status
 
-This public repository is currently best described as a polished public prototype.
+MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
 
-### Already in place
+### Strong today
 
-- working frontend and backend app structure
-- seeded sample data for immediate exploration
-- structured operational workflows across scenarios, runs, safety, lessons, and reviews
-- API payload validation for create and update flows
-- health and stats endpoints that expose the active runtime mode
-- file-backed runtime persistence for production-style runs
-- reusable smoke tests for development and production runtime checks
-- public CI for typecheck, build, and smoke validation
+- working frontend and backend application structure
+- seeded workspace data for immediate exploration
+- structured flows across scenarios, runs, safety checks, lessons, and reviews
+- request validation for create and update flows
+- runtime visibility through `/api/health` and `/api/stats`
+- file-backed persistence for production-style runs
+- repeatable smoke tests for development and production runtime checks
+- CI that runs typecheck, build, and smoke validation
 
-### Not finished yet
+### Next maturity step
 
-- PostgreSQL-backed persistence is not wired in yet, even if `DATABASE_URL` is set
-- authentication and multi-user support
-- deeper scenario-specific tests beyond the current runtime smoke coverage
-- full production hardening
+- PostgreSQL-backed persistence is still not wired in, even if `DATABASE_URL` is set
+- authentication and multi-user collaboration are still missing
+- scenario-specific test depth can still go further
+- full production hardening remains future work
 
-That means the repo is already useful for internal evaluation, demos, product exploration, and extension work, but it should not be presented as a finished production platform.
+That makes the repo strong for internal evaluation, demos, product exploration, and extension work today, while still leaving clear room for a more enterprise-ready next version.
 
 ---
 
@@ -254,10 +254,10 @@ That means the repo is already useful for internal evaluation, demos, product ex
 - Express API backend
 - TanStack Query for data fetching
 - Tailwind CSS and Radix UI for interface primitives
-- Drizzle ORM schema foundation
-- PostgreSQL-compatible database path prepared for future persistence
 - Zod-based request validation
-- GitHub Actions CI for typecheck and build
+- runtime-aware health and stats endpoints
+- file-backed persistence for production-style runs
+- GitHub Actions CI for typecheck, build, and smoke validation
 
 ## Project structure
 
@@ -359,11 +359,10 @@ MavyClaw is built around a few practical ideas:
 
 Before adopting the repo more broadly, keep these limits in mind:
 
-- the default development runtime is still in-memory on purpose
+- development still defaults to in-memory runtime for speed
 - PostgreSQL-backed persistence is not implemented yet
-- there is no authentication layer yet
-- there is no role or permission model yet
-- some production concerns remain intentionally out of scope for the public prototype stage
+- authentication and role-based access are not in place yet
+- some production concerns remain intentionally out of scope for the current public stage
 
 ## Suggested next extensions
 
@@ -376,7 +375,6 @@ Teams adopting MavyClaw will likely want to add:
 - approval workflows
 - attachments or richer evidence handling
 - richer scenario-specific automated test coverage
-- PostgreSQL-backed persistence
 - production deployment and environment management
 
 ## Safety note
