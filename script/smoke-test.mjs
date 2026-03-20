@@ -6,10 +6,13 @@ import { dirname, resolve } from "node:path";
 
 const rootDir = resolve(dirname(new URL(import.meta.url).pathname), "..");
 const mode = process.env.SMOKE_MODE ?? "prod-file";
-const defaultPort = mode === "dev-memory" ? "5071" : "5072";
+const defaultPort = mode === "dev-memory" ? "5071" : mode === "prod-postgres" ? "5073" : "5072";
 const port = Number(process.env.SMOKE_PORT ?? defaultPort);
 const dataFile = resolve(rootDir, `.runtime/smoke-${mode}.json`);
 const logPrefix = `[smoke:${mode}]`;
+const databaseUrl = mode === "prod-postgres"
+  ? (process.env.DATABASE_URL ?? "postgresql://mavyclaw:mavyclaw@127.0.0.1:5432/mavyclaw")
+  : process.env.DATABASE_URL;
 
 function assert(condition, message) {
   if (!condition) {
@@ -54,6 +57,12 @@ function startServer() {
     DATA_FILE: dataFile,
   };
 
+  if (databaseUrl) {
+    env.DATABASE_URL = databaseUrl;
+  } else {
+    delete env.DATABASE_URL;
+  }
+
   let command;
   let args;
 
@@ -64,7 +73,7 @@ function startServer() {
     args = [resolve(rootDir, "node_modules/.bin/tsx"), "server/index.ts"];
   } else {
     env.NODE_ENV = "production";
-    env.STORAGE_BACKEND = "file";
+    env.STORAGE_BACKEND = mode === "prod-postgres" ? "postgres" : "file";
     command = process.execPath;
     args = [resolve(rootDir, "dist/index.cjs")];
   }
@@ -116,6 +125,24 @@ async function run() {
     rmSync(dataFile, { force: true });
   }
 
+  if (mode === "prod-postgres") {
+    const reset = spawn("psql", [databaseUrl, "-c", "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"], {
+      cwd: rootDir,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+
+    let stderr = "";
+    for await (const chunk of reset.stderr) {
+      stderr += chunk.toString();
+    }
+
+    const exitCode = await new Promise((resolve) => reset.on("close", resolve));
+    if (exitCode !== 0) {
+      throw new Error(`Failed to reset PostgreSQL smoke database: ${stderr}`);
+    }
+  }
+
   let server = startServer();
   await waitForServer();
 
@@ -127,6 +154,11 @@ async function run() {
     if (mode === "dev-memory") {
       assert(health.body.runtime === "memory", `Expected memory runtime, received ${health.body.runtime}`);
       assert(health.body.persistence === "ephemeral", `Expected ephemeral persistence, received ${health.body.persistence}`);
+    } else if (mode === "prod-postgres") {
+      assert(health.body.runtime === "postgres", `Expected postgres runtime, received ${health.body.runtime}`);
+      assert(health.body.persistence === "database", `Expected database persistence, received ${health.body.persistence}`);
+      assert(health.body.databaseConfigured === true, "Expected databaseConfigured=true for postgres runtime");
+      assert(health.body.dataFile === null, `Expected no data file for postgres runtime, received ${health.body.dataFile}`);
     } else {
       assert(health.body.runtime === "file", `Expected file runtime, received ${health.body.runtime}`);
       assert(health.body.persistence === "disk", `Expected disk persistence, received ${health.body.persistence}`);
@@ -165,13 +197,13 @@ async function run() {
     });
     assert(invalidRun.response.status === 400, `Expected invalid payload to return 400, received ${invalidRun.response.status}`);
 
-    if (mode === "prod-file") {
+    if (mode === "prod-file" || mode === "prod-postgres") {
       await stopServer(server);
       server = startServer();
       await waitForServer();
 
       const statsAfterRestart = await fetchJson("/api/stats");
-      assert(statsAfterRestart.body.totalRuns === runsBefore + 1, "File persistence did not survive restart");
+      assert(statsAfterRestart.body.totalRuns === runsBefore + 1, `${mode} persistence did not survive restart`);
 
       const runs = await fetchJson("/api/runs");
       const created = runs.body.find((item) => item.operatorNote === payload.operatorNote);

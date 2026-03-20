@@ -31,5 +31,18 @@ jobs:
       - name: Smoke test (development runtime)
         run: npm run smoke:dev
 
+      - name: Start PostgreSQL
+        uses: harmon758/postgresql-action@v1
+        with:
+          postgresql version: '17'
+          postgresql db: mavyclaw
+          postgresql user: mavyclaw
+          postgresql password: mavyclaw
+
       - name: Smoke test (production file runtime)
         run: npm run smoke:prod
+
+      - name: Smoke test (production PostgreSQL runtime)
+        env:
+          DATABASE_URL: postgresql://mavyclaw:mavyclaw@127.0.0.1:5432/mavyclaw
+        run: npm run smoke:postgres

@@ -232,15 +232,16 @@ MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
 - structured flows across scenarios, runs, safety checks, lessons, and reviews
 - request validation for create and update flows
 - runtime visibility through `/api/health` and `/api/stats`
-- file-backed persistence for production-style runs
-- repeatable smoke tests for development and production runtime checks
+- PostgreSQL-backed persistence when `DATABASE_URL` is available
+- file-backed persistence as a safe fallback when Postgres is not configured
+- repeatable smoke tests for development, file runtime, and PostgreSQL runtime checks
 - CI that runs typecheck, build, and smoke validation
 
 ### Next maturity step
 
-- PostgreSQL-backed persistence is still not wired in, even if `DATABASE_URL` is set
 - authentication and multi-user collaboration are still missing
 - scenario-specific test depth can still go further
+- richer migrations and stricter relational constraints can still be added
 - full production hardening remains future work
 
 That makes the repo strong for internal evaluation, demos, product exploration, and extension work today, while still leaving clear room for a more enterprise-ready next version.
@@ -256,7 +257,8 @@ That makes the repo strong for internal evaluation, demos, product exploration, 
 - Tailwind CSS and Radix UI for interface primitives
 - Zod-based request validation
 - runtime-aware health and stats endpoints
-- file-backed persistence for production-style runs
+- PostgreSQL runtime auto-activation when `DATABASE_URL` is present
+- file-backed persistence fallback for production-style runs without Postgres
 - GitHub Actions CI for typecheck, build, and smoke validation
 
 ## Project structure
@@ -277,7 +279,7 @@ script/        Build scripts
 
 - Node.js 20+
 - npm 10+
-- PostgreSQL-compatible database only if you want to continue the future Drizzle/Postgres path
+- PostgreSQL-compatible database only if you want the PostgreSQL runtime path
 
 ### Local setup
 
@@ -306,6 +308,8 @@ Supported environment variables:
 - `DATA_FILE`
 - `DATABASE_URL`
 
+`STORAGE_BACKEND` accepts `memory`, `file`, or `postgres`.
+
 Example:
 
 ```env
@@ -318,7 +322,7 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 Important note:
 
-Development defaults to seeded in-memory storage for fast iteration. Production-style runs now default to file-backed persistence, which keeps created records across restarts. `DATABASE_URL` is still reserved for the future PostgreSQL-backed runtime and does not switch persistence by itself yet.
+Development defaults to seeded in-memory storage for fast iteration. When `DATABASE_URL` is present, the app now switches to PostgreSQL runtime automatically and reports `runtime: postgres` with `persistence: database` in `/api/health` and `/api/stats`. If PostgreSQL is not configured in production, the app falls back to file-backed persistence, which keeps created records across restarts.
 
 ---
 
@@ -334,7 +338,7 @@ Current API surface includes routes for:
 - `/api/reviews`
 - `/api/stats`
 
-The API currently includes basic payload validation for create and update flows, plus runtime health and persistence reporting through `/api/health` and `/api/stats`.
+The API currently includes basic payload validation for create and update flows, plus runtime health and persistence reporting through `/api/health` and `/api/stats`. Those endpoints now distinguish memory, file, and PostgreSQL runtime modes.
 
 ## Public docs
 
@@ -360,15 +364,14 @@ MavyClaw is built around a few practical ideas:
 Before adopting the repo more broadly, keep these limits in mind:
 
 - development still defaults to in-memory runtime for speed
-- PostgreSQL-backed persistence is not implemented yet
 - authentication and role-based access are not in place yet
 - some production concerns remain intentionally out of scope for the current public stage
+- the current PostgreSQL bootstrap uses runtime table creation instead of a formal migration chain
 
 ## Suggested next extensions
 
 Teams adopting MavyClaw will likely want to add:
 
-- PostgreSQL-backed persistence
 - auth and role-based access
 - benchmark import and export flows
 - richer run analytics
@@ -376,6 +379,7 @@ Teams adopting MavyClaw will likely want to add:
 - attachments or richer evidence handling
 - richer scenario-specific automated test coverage
 - production deployment and environment management
+- formal database migrations and stronger relational constraints
 
 ## Safety note
 

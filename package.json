@@ -20,6 +20,7 @@
     "smoke": "node script/smoke-test.mjs",
     "smoke:dev": "SMOKE_MODE=dev-memory node script/smoke-test.mjs",
     "smoke:prod": "SMOKE_MODE=prod-file node script/smoke-test.mjs",
+    "smoke:postgres": "SMOKE_MODE=prod-postgres node script/smoke-test.mjs",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

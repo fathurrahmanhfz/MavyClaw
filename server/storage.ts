@@ -1,19 +1,32 @@
 import {
-  type Scenario, type InsertScenario,
-  type Run, type InsertRun,
-  type SafetyCheck, type InsertSafetyCheck,
-  type Lesson, type InsertLesson,
-  type Review, type InsertReview,
+  scenarios,
+  runs,
+  safetyChecks,
+  lessons,
+  reviews,
+  type Scenario,
+  type InsertScenario,
+  type Run,
+  type InsertRun,
+  type SafetyCheck,
+  type InsertSafetyCheck,
+  type Lesson,
+  type InsertLesson,
+  type Review,
+  type InsertReview,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
+import { eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
-export type StorageRuntime = "memory" | "file";
+export type StorageRuntime = "memory" | "file" | "postgres";
 
 export interface StorageRuntimeInfo {
   runtime: StorageRuntime;
-  persistence: "ephemeral" | "disk";
+  persistence: "ephemeral" | "disk" | "database";
   databaseConfigured: boolean;
   dataFile: string | null;
 }
@@ -34,10 +47,22 @@ function defaultDataFilePath() {
   return resolve(process.cwd(), process.env.DATA_FILE ?? ".runtime/mavyclaw-data.json");
 }
 
+function stripUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 function requestedStorageRuntime(): StorageRuntime {
-  const requested = (process.env.STORAGE_BACKEND ?? (process.env.NODE_ENV === "production" ? "file" : "memory"))
-    .toLowerCase();
-  return requested === "file" ? "file" : "memory";
+  const requested = process.env.STORAGE_BACKEND?.toLowerCase();
+
+  if (requested === "memory" || requested === "file" || requested === "postgres") {
+    return requested;
+  }
+
+  if (process.env.DATABASE_URL) {
+    return "postgres";
+  }
+
+  return process.env.NODE_ENV === "production" ? "file" : "memory";
 }
 
 export interface IStorage {
@@ -670,8 +695,264 @@ class FileStorage extends MemStorage {
   }
 }
 
+class PostgresStorage extends MemStorage {
+  private readonly pool: Pool;
+  private readonly db;
+  private readonly ready: Promise<void>;
+
+  constructor(private readonly databaseUrl: string) {
+    super();
+    this.pool = new Pool({ connectionString: databaseUrl });
+    this.db = drizzle(this.pool);
+    this.ready = this.initialize();
+  }
+
+  override async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
+    await this.ready;
+    return {
+      runtime: "postgres",
+      persistence: "database",
+      databaseConfigured: true,
+      dataFile: null,
+    };
+  }
+
+  override async getScenarios(): Promise<Scenario[]> {
+    await this.ready;
+    return this.db.select().from(scenarios).orderBy(scenarios.id);
+  }
+
+  override async getScenario(id: string): Promise<Scenario | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(scenarios).where(eq(scenarios.id, id));
+    return record;
+  }
+
+  override async createScenario(payload: InsertScenario): Promise<Scenario> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(scenarios)
+      .values({ ...payload, id: randomUUID() })
+      .returning();
+    return record;
+  }
+
+  override async getRuns(): Promise<Run[]> {
+    await this.ready;
+    return this.db.select().from(runs).orderBy(runs.createdAt);
+  }
+
+  override async getRun(id: string): Promise<Run | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(runs).where(eq(runs.id, id));
+    return record;
+  }
+
+  override async createRun(payload: InsertRun): Promise<Run> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(runs)
+      .values({
+        ...payload,
+        id: randomUUID(),
+        operatorNote: payload.operatorNote ?? null,
+        evidence: payload.evidence ?? null,
+        safetyDecision: payload.safetyDecision ?? null,
+      })
+      .returning();
+    return record;
+  }
+
+  override async updateRun(id: string, data: Partial<InsertRun>): Promise<Run | undefined> {
+    await this.ready;
+    const [record] = await this.db
+      .update(runs)
+      .set(stripUndefined({
+        ...data,
+        updatedAt: data.updatedAt ?? new Date().toISOString(),
+      }))
+      .where(eq(runs.id, id))
+      .returning();
+    return record;
+  }
+
+  override async getSafetyChecks(): Promise<SafetyCheck[]> {
+    await this.ready;
+    return this.db.select().from(safetyChecks).orderBy(safetyChecks.createdAt);
+  }
+
+  override async getSafetyCheck(id: string): Promise<SafetyCheck | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(safetyChecks).where(eq(safetyChecks.id, id));
+    return record;
+  }
+
+  override async createSafetyCheck(payload: InsertSafetyCheck): Promise<SafetyCheck> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(safetyChecks)
+      .values({
+        ...payload,
+        id: randomUUID(),
+        runId: payload.runId ?? null,
+      })
+      .returning();
+    return record;
+  }
+
+  override async getLessons(): Promise<Lesson[]> {
+    await this.ready;
+    return this.db.select().from(lessons).orderBy(lessons.createdAt);
+  }
+
+  override async getLesson(id: string): Promise<Lesson | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(lessons).where(eq(lessons.id, id));
+    return record;
+  }
+
+  override async createLesson(payload: InsertLesson): Promise<Lesson> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(lessons)
+      .values({
+        ...payload,
+        id: randomUUID(),
+        taxonomyL2: payload.taxonomyL2 ?? null,
+      })
+      .returning();
+    return record;
+  }
+
+  override async getReviews(): Promise<Review[]> {
+    await this.ready;
+    return this.db.select().from(reviews).orderBy(reviews.createdAt);
+  }
+
+  override async getReview(id: string): Promise<Review | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(reviews).where(eq(reviews.id, id));
+    return record;
+  }
+
+  override async createReview(payload: InsertReview): Promise<Review> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(reviews)
+      .values({
+        ...payload,
+        id: randomUUID(),
+        runId: payload.runId ?? null,
+      })
+      .returning();
+    return record;
+  }
+
+  private async initialize() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS scenarios (
+        id varchar PRIMARY KEY,
+        title text NOT NULL,
+        category text NOT NULL,
+        difficulty text NOT NULL,
+        description text NOT NULL,
+        objective text NOT NULL,
+        acceptance_criteria text NOT NULL,
+        safe_steps text NOT NULL,
+        anti_patterns text NOT NULL,
+        verification_checklist text NOT NULL,
+        target_evidence text NOT NULL,
+        primary_risk text NOT NULL,
+        readiness text NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS runs (
+        id varchar PRIMARY KEY,
+        scenario_id varchar NOT NULL,
+        status text NOT NULL,
+        operator_note text,
+        evidence text,
+        safety_decision text,
+        created_at text NOT NULL,
+        updated_at text NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS safety_checks (
+        id varchar PRIMARY KEY,
+        run_id varchar,
+        target_env text NOT NULL,
+        action_mode text NOT NULL,
+        affected_assets text NOT NULL,
+        min_verification text NOT NULL,
+        recovery_path text NOT NULL,
+        decision text NOT NULL,
+        reason text NOT NULL,
+        created_at text NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS lessons (
+        id varchar PRIMARY KEY,
+        title text NOT NULL,
+        context text NOT NULL,
+        taxonomy_l1 text NOT NULL,
+        taxonomy_l2 text,
+        symptom text NOT NULL,
+        root_cause text NOT NULL,
+        impact text NOT NULL,
+        prevention text NOT NULL,
+        status text NOT NULL,
+        promotion text NOT NULL,
+        created_at text NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS reviews (
+        id varchar PRIMARY KEY,
+        run_id varchar,
+        task_goal text NOT NULL,
+        final_result text NOT NULL,
+        result_status text NOT NULL,
+        evidence text NOT NULL,
+        what_worked text NOT NULL,
+        what_failed text NOT NULL,
+        near_miss text NOT NULL,
+        safest_next_step text NOT NULL,
+        created_at text NOT NULL
+      );
+    `);
+
+    await this.seedIfEmpty();
+  }
+
+  private async seedIfEmpty() {
+    const [{ count }] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(scenarios);
+
+    if (count > 0) {
+      return;
+    }
+
+    const snapshot = this.snapshot();
+
+    await this.db.insert(scenarios).values(snapshot.scenarios).onConflictDoNothing({ target: scenarios.id });
+    await this.db.insert(runs).values(snapshot.runs).onConflictDoNothing({ target: runs.id });
+    await this.db.insert(safetyChecks).values(snapshot.safetyChecks).onConflictDoNothing({ target: safetyChecks.id });
+    await this.db.insert(lessons).values(snapshot.lessons).onConflictDoNothing({ target: lessons.id });
+    await this.db.insert(reviews).values(snapshot.reviews).onConflictDoNothing({ target: reviews.id });
+  }
+}
+
 function createStorage(): IStorage {
   const runtime = requestedStorageRuntime();
+
+  if (runtime === "postgres") {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is required when STORAGE_BACKEND=postgres");
+    }
+
+    return new PostgresStorage(process.env.DATABASE_URL);
+  }
+
   if (runtime === "file") {
     return new FileStorage(defaultDataFilePath());
   }
