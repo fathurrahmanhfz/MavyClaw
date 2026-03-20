@@ -85,6 +85,7 @@ export interface IStorage {
   getScenarios(): Promise<Scenario[]>;
   getScenario(id: string): Promise<Scenario | undefined>;
   createScenario(s: InsertScenario): Promise<Scenario>;
+  updateScenario(id: string, data: Partial<InsertScenario>): Promise<Scenario | undefined>;
 
   // Runs
   getRuns(): Promise<Run[]>;
@@ -101,11 +102,13 @@ export interface IStorage {
   getLessons(): Promise<Lesson[]>;
   getLesson(id: string): Promise<Lesson | undefined>;
   createLesson(l: InsertLesson): Promise<Lesson>;
+  updateLesson(id: string, data: Partial<InsertLesson>): Promise<Lesson | undefined>;
 
   // Reviews
   getReviews(): Promise<Review[]>;
   getReview(id: string): Promise<Review | undefined>;
   createReview(r: InsertReview): Promise<Review>;
+  updateReview(id: string, data: Partial<InsertReview>): Promise<Review | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -130,6 +133,14 @@ export class MemStorage implements IStorage {
     this.scenarios.set(id, scenario);
     this.persistSnapshot();
     return scenario;
+  }
+  async updateScenario(id: string, data: Partial<InsertScenario>): Promise<Scenario | undefined> {
+    const scenario = this.scenarios.get(id);
+    if (!scenario) return undefined;
+    const updated: Scenario = { ...scenario, ...stripUndefined(data as Record<string, unknown>) as Partial<InsertScenario> };
+    this.scenarios.set(id, updated);
+    this.persistSnapshot();
+    return updated;
   }
 
   // ── Runs ──
@@ -186,6 +197,14 @@ export class MemStorage implements IStorage {
     this.persistSnapshot();
     return lesson;
   }
+  async updateLesson(id: string, data: Partial<InsertLesson>): Promise<Lesson | undefined> {
+    const lesson = this.lessons.get(id);
+    if (!lesson) return undefined;
+    const updated: Lesson = { ...lesson, ...stripUndefined(data as Record<string, unknown>) as Partial<InsertLesson> };
+    this.lessons.set(id, updated);
+    this.persistSnapshot();
+    return updated;
+  }
 
   // ── Reviews ──
   async getReviews() { return Array.from(this.reviews.values()); }
@@ -200,6 +219,14 @@ export class MemStorage implements IStorage {
     this.reviews.set(id, review);
     this.persistSnapshot();
     return review;
+  }
+  async updateReview(id: string, data: Partial<InsertReview>): Promise<Review | undefined> {
+    const review = this.reviews.get(id);
+    if (!review) return undefined;
+    const updated: Review = { ...review, ...stripUndefined(data as Record<string, unknown>) as Partial<InsertReview> };
+    this.reviews.set(id, updated);
+    this.persistSnapshot();
+    return updated;
   }
 
   async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
@@ -811,6 +838,16 @@ class PostgresStorage extends MemStorage {
     return record;
   }
 
+  override async updateScenario(id: string, data: Partial<InsertScenario>): Promise<Scenario | undefined> {
+    await this.ready;
+    const [record] = await this.db
+      .update(scenarios)
+      .set(stripUndefined(data as Record<string, unknown>))
+      .where(eq(scenarios.id, id))
+      .returning();
+    return record;
+  }
+
   override async getRuns(): Promise<Run[]> {
     await this.ready;
     return this.db.select().from(runs).orderBy(runs.createdAt);
@@ -898,6 +935,16 @@ class PostgresStorage extends MemStorage {
     return record;
   }
 
+  override async updateLesson(id: string, data: Partial<InsertLesson>): Promise<Lesson | undefined> {
+    await this.ready;
+    const [record] = await this.db
+      .update(lessons)
+      .set(stripUndefined(data as Record<string, unknown>))
+      .where(eq(lessons.id, id))
+      .returning();
+    return record;
+  }
+
   override async getReviews(): Promise<Review[]> {
     await this.ready;
     return this.db.select().from(reviews).orderBy(reviews.createdAt);
@@ -918,6 +965,16 @@ class PostgresStorage extends MemStorage {
         id: randomUUID(),
         runId: payload.runId ?? null,
       })
+      .returning();
+    return record;
+  }
+
+  override async updateReview(id: string, data: Partial<InsertReview>): Promise<Review | undefined> {
+    await this.ready;
+    const [record] = await this.db
+      .update(reviews)
+      .set(stripUndefined(data as Record<string, unknown>))
+      .where(eq(reviews.id, id))
       .returning();
     return record;
   }

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { setupAuth } from "./auth";
+import { HttpError } from "./errors";
 
 const app = express();
 const httpServer = createServer(app);
@@ -77,17 +78,24 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    console.error("Internal Server Error:", err);
-
+  // Central error handler — adapted from Paperclip's error-handler middleware.
+  // HttpError instances produced anywhere in route handlers are serialized here,
+  // keeping individual routes free of inline .status().json() error plumbing.
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    if (err instanceof HttpError) {
+      return res.status(err.status).json({
+        error: err.message,
+        ...(err.details ? { details: err.details } : {}),
+      });
+    }
+
+    const message = err instanceof Error ? err.message : "Internal Server Error";
+    console.error("Internal Server Error:", err);
+    return res.status(500).json({ error: message });
   });
 
   // importantly only setup vite in development and after

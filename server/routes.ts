@@ -26,6 +26,7 @@ import {
   toRunPatchFromAgentProgress,
 } from "./agent";
 import { storage, type StorageSnapshot } from "./storage";
+import { HttpError } from "./errors";
 
 const runUpdateSchema = insertRunSchema
   .partial()
@@ -258,6 +259,26 @@ export async function registerRoutes(
     res.status(201).json(scenario);
   });
 
+  // PATCH /api/scenarios/:id — partial update for a scenario
+  // Pattern adapted from Paperclip: mutations use partial Zod schemas so only
+  // provided fields are changed and at least one field must be supplied.
+  app.patch("/api/scenarios/:id", requireRole("editor"), async (req, res, next) => {
+    const scenarioUpdateSchema = insertScenarioSchema
+      .partial()
+      .refine((p) => Object.keys(p).length > 0, { message: "At least one field must be provided" });
+    const parsed = validateBody(scenarioUpdateSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const scenarioId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getScenario(scenarioId);
+    if (!existing) return next(new HttpError(404, "Scenario not found"));
+
+    const scenario = await storage.updateScenario(scenarioId, parsed.data);
+    if (!scenario) return next(new HttpError(404, "Scenario not found"));
+    publishWorkspaceEvent("scenario-created"); // reuses scenario-created to trigger list refresh
+    res.json(scenario);
+  });
+
   app.get("/api/runs", async (_req, res) => {
     const runs = await storage.getRuns();
     res.json(runs);
@@ -285,6 +306,32 @@ export async function registerRoutes(
     const runId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const run = await storage.updateRun(runId, parsed.data);
     if (!run) return res.status(404).json({ error: "Run not found" });
+    publishWorkspaceEvent("run-updated");
+    res.json(run);
+  });
+
+  // POST /api/runs/:id/cancel — explicit cancellation endpoint.
+  // Inspired by Paperclip's board-level "pause/cancel any agent run" capability.
+  // Setting status to "failed" surfaces a named cancel action rather than
+  // requiring callers to PATCH with an arbitrary status string.
+  app.post("/api/runs/:id/cancel", requireRole("editor"), async (req, res, next) => {
+    const runId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getRun(runId);
+    if (!existing) return next(new HttpError(404, "Run not found"));
+
+    const terminalStatuses = new Set(["passed", "failed"]);
+    if (terminalStatuses.has(existing.status)) {
+      return next(new HttpError(409, `Run is already in terminal status '${existing.status}' and cannot be cancelled`));
+    }
+
+    const note = typeof req.body?.reason === "string" && req.body.reason.trim()
+      ? req.body.reason.trim()
+      : "Cancelled by operator";
+    const run = await storage.updateRun(runId, {
+      status: "failed",
+      operatorNote: note,
+      updatedAt: new Date().toISOString(),
+    });
     publishWorkspaceEvent("run-updated");
     res.json(run);
   });
@@ -347,6 +394,24 @@ export async function registerRoutes(
     res.status(201).json(lesson);
   });
 
+  // PATCH /api/lessons/:id — partial update for a lesson
+  app.patch("/api/lessons/:id", requireRole("editor"), async (req, res, next) => {
+    const lessonUpdateSchema = insertLessonSchema
+      .partial()
+      .refine((p) => Object.keys(p).length > 0, { message: "At least one field must be provided" });
+    const parsed = validateBody(lessonUpdateSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const lessonId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getLesson(lessonId);
+    if (!existing) return next(new HttpError(404, "Lesson not found"));
+
+    const lesson = await storage.updateLesson(lessonId, parsed.data);
+    if (!lesson) return next(new HttpError(404, "Lesson not found"));
+    publishWorkspaceEvent("lesson-created"); // triggers list refresh
+    res.json(lesson);
+  });
+
   app.get("/api/reviews", async (_req, res) => {
     const reviews = await storage.getReviews();
     res.json(reviews);
@@ -365,6 +430,24 @@ export async function registerRoutes(
     const review = await storage.createReview(parsed.data);
     publishWorkspaceEvent("review-created");
     res.status(201).json(review);
+  });
+
+  // PATCH /api/reviews/:id — partial update for a review
+  app.patch("/api/reviews/:id", requireRole("editor"), async (req, res, next) => {
+    const reviewUpdateSchema = insertReviewSchema
+      .partial()
+      .refine((p) => Object.keys(p).length > 0, { message: "At least one field must be provided" });
+    const parsed = validateBody(reviewUpdateSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const reviewId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getReview(reviewId);
+    if (!existing) return next(new HttpError(404, "Review not found"));
+
+    const review = await storage.updateReview(reviewId, parsed.data);
+    if (!review) return next(new HttpError(404, "Review not found"));
+    publishWorkspaceEvent("review-created"); // triggers list refresh
+    res.json(review);
   });
 
   app.get("/api/stats", async (_req, res) => {

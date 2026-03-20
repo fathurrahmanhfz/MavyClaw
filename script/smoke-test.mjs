@@ -482,6 +482,71 @@ async function run() {
     });
     assert(invalidRun.response.status === 400, `Expected invalid payload to return 400, received ${invalidRun.response.status}`);
 
+    // ── New PATCH endpoints (Paperclip-inspired) ──────────────────────────────
+
+    // 1. PATCH /api/scenarios/:id — partial scenario update
+    const patchScenario = await fetchJson("/api/scenarios/sc-001", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readiness: "needs-review" }),
+    });
+    assert(patchScenario.response.ok, `PATCH scenario failed: ${patchScenario.text}`);
+    assert(patchScenario.body.readiness === "needs-review", "Scenario readiness did not update");
+    assert(patchScenario.body.id === "sc-001", "Scenario PATCH changed the wrong record");
+
+    // 2. PATCH /api/runs/:id/cancel — explicit cancel endpoint
+    const cancelRunId = importedRuns.body[0].id;
+    const cancelRun = await fetchJson(`/api/runs/${cancelRunId}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Cancelled in smoke test" }),
+    });
+    assert(cancelRun.response.ok, `Run cancel failed: ${cancelRun.text}`);
+    assert(cancelRun.body.status === "failed", `Expected cancelled run status to be 'failed', got '${cancelRun.body.status}'`);
+    assert(cancelRun.body.operatorNote === "Cancelled in smoke test", "Cancel reason not stored");
+
+    // Cancelling an already-terminal run should return 409
+    const doubleCancel = await fetchJson(`/api/runs/${cancelRunId}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Should be rejected" }),
+    });
+    assert(doubleCancel.response.status === 409, `Expected 409 for double-cancel, got ${doubleCancel.response.status}`);
+
+    // 3. PATCH /api/lessons/:id — partial lesson update
+    const allLessons = await fetchJson("/api/lessons");
+    assert(allLessons.body.length > 0, "Expected at least one lesson for PATCH test");
+    const firstLessonId = allLessons.body[0].id;
+    const patchLesson = await fetchJson(`/api/lessons/${firstLessonId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "hypothesis" }),
+    });
+    assert(patchLesson.response.ok, `PATCH lesson failed: ${patchLesson.text}`);
+    assert(patchLesson.body.status === "hypothesis", "Lesson status did not update");
+    assert(patchLesson.body.id === firstLessonId, "Lesson PATCH changed the wrong record");
+
+    // 4. PATCH /api/reviews/:id — partial review update
+    const allReviews = await fetchJson("/api/reviews");
+    if (allReviews.body.length > 0) {
+      const firstReviewId = allReviews.body[0].id;
+      const patchReview = await fetchJson(`/api/reviews/${firstReviewId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resultStatus: "on-hold" }),
+      });
+      assert(patchReview.response.ok, `PATCH review failed: ${patchReview.text}`);
+      assert(patchReview.body.resultStatus === "on-hold", "Review resultStatus did not update");
+    }
+
+    // 5. Empty PATCH body should return 400
+    const emptyPatch = await fetchJson("/api/scenarios/sc-001", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert(emptyPatch.response.status === 400, `Expected 400 for empty PATCH body, got ${emptyPatch.response.status}`);
+
     if (mode === "prod-file" || mode === "prod-postgres") {
       await stopServer(server);
       server = startServer();
