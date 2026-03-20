@@ -11,9 +11,11 @@ import { ShieldCheck, AlertTriangle, Plus } from "lucide-react";
 import type { SafetyCheck, Run } from "@shared/schema";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function SafetyGate() {
   const { toast } = useToast();
+  const { canWrite } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     runId: "",
@@ -84,11 +86,19 @@ export default function SafetyGate() {
             Evaluate risk before higher-impact actions
           </p>
         </div>
-        <Button size="sm" onClick={() => setShowForm(!showForm)} data-testid="button-create-safety">
+        <Button size="sm" onClick={() => setShowForm(!showForm)} disabled={!canWrite} data-testid="button-create-safety">
           <Plus className="w-4 h-4 mr-1" />
           New Safety Check
         </Button>
       </div>
+
+      {!canWrite ? (
+        <Card className="bg-card border-card-border">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Your current role is read-only. Sign in as an editor or admin to record safety decisions.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showForm && (
         <Card className="bg-card border-card-border" data-testid="form-create-safety">

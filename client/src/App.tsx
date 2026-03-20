@@ -14,6 +14,9 @@ import SafetyGate from "@/pages/SafetyGate";
 import Lessons from "@/pages/Lessons";
 import Reviews from "@/pages/Reviews";
 import NotFound from "@/pages/not-found";
+import { AuthProvider } from "@/lib/auth";
+import AuthGate from "@/components/AuthGate";
+import { LiveUpdatesProvider } from "@/lib/live";
 
 function AppRouter() {
   return (
@@ -36,12 +39,18 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Router hook={useHashLocation}>
-            <AppRouter />
-          </Router>
-        </TooltipProvider>
+        <AuthProvider>
+          <LiveUpdatesProvider>
+            <TooltipProvider>
+              <Toaster />
+              <AuthGate>
+                <Router hook={useHashLocation}>
+                  <AppRouter />
+                </Router>
+              </AuthGate>
+            </TooltipProvider>
+          </LiveUpdatesProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -2,9 +2,18 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { setupAuth } from "./auth";
 
 const app = express();
 const httpServer = createServer(app);
+
+function parseTrustProxy(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  if (/^\d+$/.test(normalized)) return Number(normalized);
+  return value;
+}
 
 declare module "http" {
   interface IncomingMessage {
@@ -21,6 +30,12 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+if (process.env.TRUST_PROXY) {
+  app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
+}
+
+setupAuth(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

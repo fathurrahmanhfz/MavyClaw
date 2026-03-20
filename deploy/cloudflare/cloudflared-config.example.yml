@@ -1,6 +1,7 @@
 # Example Cloudflare Tunnel configuration for publishing MavyClaw safely.
 # Replace the placeholders before use.
 # Ingress-based configs must end with a catch-all rule.
+# Keep TRUST_PROXY=1 and COOKIE_SECURE=auto in the app environment when using HTTPS at the edge.
 
 tunnel: YOUR_TUNNEL_UUID
 credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json

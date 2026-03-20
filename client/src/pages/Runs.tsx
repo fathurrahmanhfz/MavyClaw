@@ -10,9 +10,11 @@ import { Play, AlertTriangle, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import type { Run, Scenario } from "@shared/schema";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function Runs() {
   const { toast } = useToast();
+  const { canWrite } = useAuth();
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newScenarioId, setNewScenarioId] = useState("");
@@ -96,12 +98,21 @@ export default function Runs() {
         <Button
           size="sm"
           onClick={() => setShowCreate(!showCreate)}
+          disabled={!canWrite}
           data-testid="button-create-run"
         >
           <Plus className="w-4 h-4 mr-1" />
           Create Run
         </Button>
       </div>
+
+      {!canWrite ? (
+        <Card className="bg-card border-card-border">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Your current role is read-only. Sign in as an editor or admin to create or update runs.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showCreate && (
         <Card className="bg-card border-card-border" data-testid="form-create-run">
@@ -215,7 +226,7 @@ export default function Runs() {
                             variant={run.status === s ? "default" : "outline"}
                             size="sm"
                             className="text-xs h-7"
-                            disabled={run.status === s || updateMutation.isPending}
+                            disabled={!canWrite || run.status === s || updateMutation.isPending}
                             onClick={() => updateMutation.mutate({ id: run.id, status: s })}
                             data-testid={`button-status-${s}-${run.id}`}
                           >

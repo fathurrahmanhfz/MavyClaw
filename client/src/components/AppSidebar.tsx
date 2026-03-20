@@ -9,10 +9,13 @@ import {
   Sun,
   Moon,
   Terminal,
+  LogOut,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
+import { useLiveUpdates } from "@/lib/live";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
@@ -26,6 +29,8 @@ const navItems = [
 export default function AppSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [location] = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const { session, canWrite, logout, isLoggingOut } = useAuth();
+  const { enabled: liveEnabled } = useLiveUpdates();
 
   const isActive = (href: string) => {
     if (href === "/") return location === "/";
@@ -90,6 +95,13 @@ export default function AppSidebar({ open, onClose }: { open: boolean; onClose: 
         </nav>
 
         <div className="px-3 py-4 border-t border-sidebar-border space-y-3">
+          <div className="rounded-lg border border-sidebar-border px-3 py-3 text-xs text-muted-foreground space-y-1" data-testid="session-summary">
+            <div className="font-medium text-sidebar-foreground">{session?.user?.name || "Unknown user"}</div>
+            <div className="font-mono">{session?.user?.username}</div>
+            <div className="uppercase tracking-wide">Role: {session?.user?.role}</div>
+            <div>{canWrite ? "Write access enabled" : "Read-only access"}</div>
+            <div>{liveEnabled ? "Live updates connected" : "Live updates offline"}</div>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -99,6 +111,17 @@ export default function AppSidebar({ open, onClose }: { open: boolean; onClose: 
           >
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => logout()}
+            disabled={isLoggingOut}
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-sidebar-foreground"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-4 h-4" />
+            {isLoggingOut ? "Signing out..." : "Sign out"}
           </Button>
           <div className="px-3 text-[10px] text-muted-foreground">
             <span className="font-mono">v0.1.0</span> · Public Prototype

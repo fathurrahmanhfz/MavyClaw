@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import { z } from "zod";
+import { getSessionState, loginHandler, logoutHandler, requireRole } from "./auth";
+import { publishWorkspaceEvent, registerWorkspaceEventsStream } from "./live";
 import {
   insertLessonSchema,
   insertReviewSchema,
@@ -70,6 +72,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.get("/api/session", (req, res) => {
+    res.json(getSessionState(req));
+  });
+
+  app.get("/api/live", requireRole("viewer"), registerWorkspaceEventsStream);
+
+  app.post("/api/session/login", loginHandler());
+  app.post("/api/session/logout", logoutHandler());
+
   app.get("/api/health", async (_req, res) => {
     const runtimeInfo = await storage.getRuntimeInfo();
 
@@ -98,11 +109,12 @@ export async function registerRoutes(
     });
   });
 
-  app.post("/api/workspace/import", async (req, res) => {
+  app.post("/api/workspace/import", requireRole("admin"), async (req, res) => {
     const parsed = validateBody(z.object({ snapshot: snapshotSchema }), req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     await storage.importSnapshot(normalizeSnapshot(parsed.data.snapshot));
+    publishWorkspaceEvent("workspace-imported");
     const runtimeInfo = await storage.getRuntimeInfo();
     res.json({
       status: "ok",
@@ -122,11 +134,12 @@ export async function registerRoutes(
     res.json(scenario);
   });
 
-  app.post("/api/scenarios", async (req, res) => {
+  app.post("/api/scenarios", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(insertScenarioSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     const scenario = await storage.createScenario(parsed.data);
+    publishWorkspaceEvent("scenario-created");
     res.status(201).json(scenario);
   });
 
@@ -141,20 +154,23 @@ export async function registerRoutes(
     res.json(run);
   });
 
-  app.post("/api/runs", async (req, res) => {
+  app.post("/api/runs", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(insertRunSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     const run = await storage.createRun(parsed.data);
+    publishWorkspaceEvent("run-created");
     res.status(201).json(run);
   });
 
-  app.patch("/api/runs/:id", async (req, res) => {
+  app.patch("/api/runs/:id", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(runUpdateSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
-    const run = await storage.updateRun(req.params.id, parsed.data);
+    const runId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const run = await storage.updateRun(runId, parsed.data);
     if (!run) return res.status(404).json({ error: "Run not found" });
+    publishWorkspaceEvent("run-updated");
     res.json(run);
   });
 
@@ -169,7 +185,7 @@ export async function registerRoutes(
     res.json(check);
   });
 
-  app.post("/api/safety-checks", async (req, res) => {
+  app.post("/api/safety-checks", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(insertSafetyCheckSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
@@ -192,6 +208,7 @@ export async function registerRoutes(
       runId: runId || null,
       decision,
     });
+    publishWorkspaceEvent("safety-check-created");
     res.status(201).json(check);
   });
 
@@ -206,11 +223,12 @@ export async function registerRoutes(
     res.json(lesson);
   });
 
-  app.post("/api/lessons", async (req, res) => {
+  app.post("/api/lessons", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(insertLessonSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     const lesson = await storage.createLesson(parsed.data);
+    publishWorkspaceEvent("lesson-created");
     res.status(201).json(lesson);
   });
 
@@ -225,11 +243,12 @@ export async function registerRoutes(
     res.json(review);
   });
 
-  app.post("/api/reviews", async (req, res) => {
+  app.post("/api/reviews", requireRole("editor"), async (req, res) => {
     const parsed = validateBody(insertReviewSchema, req.body);
     if (!parsed.ok) return res.status(400).json(parsed.error);
 
     const review = await storage.createReview(parsed.data);
+    publishWorkspaceEvent("review-created");
     res.status(201).json(review);
   });
 

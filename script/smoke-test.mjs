@@ -13,6 +13,9 @@ const logPrefix = `[smoke:${mode}]`;
 const databaseUrl = mode === "prod-postgres"
   ? (process.env.DATABASE_URL ?? "postgresql://mavyclaw:mavyclaw@127.0.0.1:5432/mavyclaw")
   : process.env.DATABASE_URL;
+const demoAuthUsername = process.env.DEMO_AUTH_USERNAME || "demo-admin";
+const demoAuthPassword = process.env.DEMO_AUTH_PASSWORD || "demo-admin";
+const demoAuthRole = process.env.DEMO_AUTH_ROLE || "admin";
 
 function assert(condition, message) {
   if (!condition) {
@@ -20,8 +23,45 @@ function assert(condition, message) {
   }
 }
 
-async function fetchJson(path, init) {
-  const response = await fetch(`http://127.0.0.1:${port}${path}`, init);
+const cookieJar = new Map();
+
+function cookieHeader() {
+  return Array.from(cookieJar.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
+
+function storeCookies(response) {
+  const raw = response.headers.get("set-cookie");
+  if (!raw) {
+    return;
+  }
+
+  const cookie = raw.split(", ").map((part, index, array) => {
+    if (index > 0 && !array[index].includes("=")) {
+      return `, ${part}`;
+    }
+    return part;
+  }).join("");
+
+  const firstPair = cookie.split(";")[0];
+  const separatorIndex = firstPair.indexOf("=");
+  if (separatorIndex > 0) {
+    const name = firstPair.slice(0, separatorIndex);
+    const value = firstPair.slice(separatorIndex + 1);
+    cookieJar.set(name, value);
+  }
+}
+
+async function fetchJson(path, init = {}) {
+  const headers = new Headers(init.headers || {});
+  const cookie = cookieHeader();
+  if (cookie) {
+    headers.set("cookie", cookie);
+  }
+
+  const response = await fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers });
+  storeCookies(response);
   const text = await response.text();
   let body;
   try {
@@ -31,6 +71,52 @@ async function fetchJson(path, init) {
   }
 
   return { response, body, text };
+}
+
+async function expectLiveWorkspaceUpdate(timeoutMs = 5000) {
+  const response = await fetch(`http://127.0.0.1:${port}/api/live`, {
+    headers: {
+      Accept: "text/event-stream",
+      cookie: cookieHeader(),
+    },
+  });
+
+  assert(response.ok, `Live stream failed: ${response.status}`);
+  assert(response.body, "Live stream body is missing");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const start = Date.now();
+  let buffer = "";
+
+  try {
+    while (Date.now() - start < timeoutMs) {
+      const readPromise = reader.read();
+      const timeoutPromise = delay(Math.min(1000, timeoutMs));
+      const winner = await Promise.race([
+        readPromise.then((result) => ({ kind: "read", result })),
+        timeoutPromise.then(() => ({ kind: "timeout" })),
+      ]);
+
+      if (winner.kind === "timeout") {
+        continue;
+      }
+
+      const { done, value } = winner.result;
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.includes("event: workspace-update") && buffer.includes("data:")) {
+        return;
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+
+  throw new Error("Did not receive workspace-update event in time");
 }
 
 async function waitForServer(timeoutMs = 20000) {
@@ -55,6 +141,11 @@ function startServer() {
     ...process.env,
     PORT: String(port),
     DATA_FILE: dataFile,
+    AUTH_MODE: process.env.AUTH_MODE || "demo",
+    DEMO_AUTH_USERNAME: demoAuthUsername,
+    DEMO_AUTH_PASSWORD: demoAuthPassword,
+    DEMO_AUTH_ROLE: demoAuthRole,
+    COOKIE_SECURE: process.env.COOKIE_SECURE || "false",
   };
 
   if (databaseUrl) {
@@ -151,6 +242,33 @@ async function run() {
     assert(health.response.ok, `Health failed: ${health.text}`);
     assert(health.body.app === "MavyClaw", "Unexpected app name");
 
+    const sessionBeforeLogin = await fetchJson("/api/session");
+    assert(sessionBeforeLogin.response.ok, `Session endpoint failed: ${sessionBeforeLogin.text}`);
+    assert(sessionBeforeLogin.body.authenticated === false, "Expected unauthenticated session before login");
+
+    const unauthorizedCreate = await fetchJson("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "sc-001",
+        status: "planned",
+        operatorNote: "Unauthorized create attempt",
+        evidence: null,
+        safetyDecision: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    assert(unauthorizedCreate.response.status === 401, `Expected write without login to return 401, received ${unauthorizedCreate.response.status}`);
+
+    const login = await fetchJson("/api/session/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: demoAuthUsername, password: demoAuthPassword }),
+    });
+    assert(login.response.ok, `Login failed: ${login.text}`);
+    assert(login.body.user.role === demoAuthRole, "Unexpected logged-in role");
+
     if (mode === "dev-memory") {
       assert(health.body.runtime === "memory", `Expected memory runtime, received ${health.body.runtime}`);
       assert(health.body.persistence === "ephemeral", `Expected ephemeral persistence, received ${health.body.persistence}`);
@@ -169,6 +287,8 @@ async function run() {
     assert(statsBefore.response.ok, `Stats failed: ${statsBefore.text}`);
     const runsBefore = statsBefore.body.totalRuns;
 
+    const liveUpdatePromise = expectLiveWorkspaceUpdate();
+
     const payload = {
       scenarioId: "sc-001",
       status: "running",
@@ -186,6 +306,7 @@ async function run() {
     });
     assert(createRun.response.status === 201, `Run creation failed: ${createRun.text}`);
     assert(createRun.body.operatorNote === payload.operatorNote, "Created run note mismatch");
+    await liveUpdatePromise;
 
     const statsAfterCreate = await fetchJson("/api/stats");
     assert(statsAfterCreate.body.totalRuns === runsBefore + 1, "Run count did not increment after create");
@@ -228,6 +349,16 @@ async function run() {
       await stopServer(server);
       server = startServer();
       await waitForServer();
+
+      const sessionAfterRestart = await fetchJson("/api/session");
+      assert(sessionAfterRestart.body.authenticated === false, "Expected session to reset after restart in smoke test");
+
+      const loginAfterRestart = await fetchJson("/api/session/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: demoAuthUsername, password: demoAuthPassword }),
+      });
+      assert(loginAfterRestart.response.ok, `Re-login after restart failed: ${loginAfterRestart.text}`);
 
       const statsAfterRestart = await fetchJson("/api/stats");
       assert(statsAfterRestart.body.totalRuns === 1, `${mode} import state did not survive restart`);

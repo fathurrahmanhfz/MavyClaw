@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { Run } from "@shared/schema";
+import { useLiveUpdates } from "@/lib/live";
 
 interface Stats {
   runtime: string;
@@ -32,6 +33,7 @@ interface Stats {
 }
 
 export default function Dashboard() {
+  const { enabled: liveEnabled } = useLiveUpdates();
   const { data: stats, isLoading, error } = useQuery<Stats>({
     queryKey: ["/api/stats"],
     queryFn: async () => {
@@ -59,6 +61,9 @@ export default function Dashboard() {
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Benchmark, run, and operational learning summary for agent teams
+        </p>
+        <p className="text-xs text-muted-foreground mt-2" data-testid="dashboard-live-indicator">
+          {liveEnabled ? "Live updates are connected" : "Live updates connect after sign-in"}
         </p>
       </div>
 

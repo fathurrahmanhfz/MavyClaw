@@ -8,6 +8,11 @@ Use this document together with:
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
+- `deploy/verify-deployment.sh`
+- `deploy/env.local.example`
+- `deploy/env.vps-file.example`
+- `deploy/env.vps-postgres.example`
+- `deploy/env.public-direct.example`
 - `deploy/nginx/mavyclaw.conf.example`
 - `deploy/caddy/Caddyfile.example`
 - `deploy/cloudflare/cloudflared-config.example.yml`
@@ -43,6 +48,9 @@ If no stronger requirement is provided, the safest defaults are:
 - `PORT=5000`
 - `STORAGE_BACKEND=file`
 - `DATA_FILE=.runtime/mavyclaw-data.json`
+- `AUTH_MODE=demo` with a real secret and strong password
+- `TRUST_PROXY=1`
+- `COOKIE_SECURE=auto`
 - publish through Nginx, Caddy, or Cloudflare Tunnel
 - supervise with systemd on a VPS
 
@@ -88,6 +96,11 @@ HOST=127.0.0.1
 PORT=5000
 STORAGE_BACKEND=file
 DATA_FILE=.runtime/mavyclaw-data.json
+AUTH_MODE=demo
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
+DEMO_AUTH_PASSWORD=replace-with-a-strong-password
 ```
 
 For a PostgreSQL-backed deployment:
@@ -98,6 +111,11 @@ HOST=127.0.0.1
 PORT=5000
 STORAGE_BACKEND=postgres
 DATABASE_URL=postgresql://user:password@host:5432/dbname
+AUTH_MODE=demo
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
+DEMO_AUTH_PASSWORD=replace-with-a-strong-password
 ```
 
 ### 3. Build and verify locally
@@ -131,6 +149,7 @@ The agent must verify:
 ```bash
 curl http://127.0.0.1:5000/api/health
 curl http://127.0.0.1:5000/api/stats
+BASE_URL=http://127.0.0.1:5000 EXPECTED_RUNTIME=file EXPECTED_PERSISTENCE=disk bash deploy/verify-deployment.sh
 ```
 
 Expected behavior:
@@ -156,6 +175,7 @@ Behavior notes for the helper:
 - it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
 - it writes a backup of the prior config when one exists
 - it validates Nginx and rolls back if reload fails
+- it keeps `/api/live` unbuffered so the dashboard can continue to refresh automatically
 
 #### Option B: Caddy
 
@@ -172,6 +192,7 @@ Behavior notes for the helper:
 - it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
 - it writes a backup of the current Caddyfile before replacing it
 - it validates Caddy and rolls back if reload fails
+- it keeps `/api/live` streaming so the dashboard can continue to refresh automatically
 
 #### Option C: Cloudflare Tunnel
 
@@ -209,6 +230,17 @@ After the proxy or tunnel is attached, the agent should verify:
 - the service should be reachable without directly exposing the app port
 
 Quick tunnels are not a production answer. Use a real tunnel for durable deployment.
+
+### Option D: direct public binding
+
+This is the least preferred option and should be used only when the operator explicitly accepts the trade-off.
+
+If direct binding is chosen:
+
+- use a strong `SESSION_SECRET`
+- use a strong password
+- keep the firewall limited to the app port you intentionally expose
+- prefer a temporary evaluation environment rather than a long-lived production deployment
 
 ## Process supervision guidance
 

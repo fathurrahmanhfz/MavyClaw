@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Download, Upload, Database, HardDrive, Layers3 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,7 @@ interface ExportPayload {
 
 export default function WorkspacePortabilityCard({ runtime, persistence }: WorkspacePortabilityCardProps) {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -59,7 +61,7 @@ export default function WorkspacePortabilityCard({ runtime, persistence }: Works
   async function handleExport() {
     setIsDownloading(true);
     try {
-      const response = await fetch("/api/workspace/export");
+      const response = await fetch("/api/workspace/export", { credentials: "include" });
       if (!response.ok) {
         throw new Error(await response.text());
       }
@@ -155,7 +157,7 @@ export default function WorkspacePortabilityCard({ runtime, persistence }: Works
             type="button"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            disabled={importMutation.isPending}
+            disabled={!isAdmin || importMutation.isPending}
             data-testid="button-import-workspace"
           >
             <Upload className="w-4 h-4" />
@@ -169,6 +171,12 @@ export default function WorkspacePortabilityCard({ runtime, persistence }: Works
             onChange={handleFileImport}
           />
         </div>
+
+        {!isAdmin ? (
+          <p className="text-xs text-muted-foreground">
+            Workspace import is restricted to admin sessions.
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

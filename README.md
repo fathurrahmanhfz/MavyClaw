@@ -36,6 +36,7 @@ MavyClaw pulls those workflows into one app with a structure that is already use
 
 This repository is valuable if you want to:
 - stand up an internal benchmark ops workspace quickly
+- publish it safely for remote browser access on a VPS or cloud host
 - understand the shape of a practical agent operations product
 - use a real working baseline instead of inventing the entire model from scratch
 - extend a lightweight prototype into a more tailored internal system
@@ -46,10 +47,11 @@ If an AI agent is given this repository URL for installation or VPS setup, it sh
 
 The short rule is:
 
-- run MavyClaw on an internal host and port
-- publish it through Nginx, Caddy, or a secure tunnel
+- run MavyClaw on an internal host and port by default
+- publish it through Nginx, Caddy, or a secure tunnel when remote browser access is needed
 - verify `/api/health` and `/api/stats` before claiming success
 - prefer file or PostgreSQL persistence for production-style setups
+- set `TRUST_PROXY=1` and `COOKIE_SECURE=auto` when HTTPS is terminated by a reverse proxy or tunnel
 - do not expose the raw app port publicly unless that risk is explicitly accepted
 
 Reference files for agents:
@@ -59,6 +61,11 @@ Reference files for agents:
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
+- `deploy/verify-deployment.sh`
+- `deploy/env.local.example`
+- `deploy/env.vps-file.example`
+- `deploy/env.vps-postgres.example`
+- `deploy/env.public-direct.example`
 - [Nginx example](deploy/nginx/mavyclaw.conf.example)
 - [Caddy example](deploy/caddy/Caddyfile.example)
 - [Cloudflare Tunnel example](deploy/cloudflare/cloudflared-config.example.yml)
@@ -75,7 +82,7 @@ Reference files for agents:
 | A pre-action safety workflow | Safety checks for environment, action mode, affected assets, recovery path, and gate decision |
 | A place to retain failure knowledge | Lessons learned with taxonomy, root cause, prevention, and promotion level |
 | A consistent review format | Post-task reviews with final result, evidence, what worked, what failed, and safest next step |
-| A fast operational overview | Dashboard summaries across scenarios, runs, lessons, reviews, safety checks, and recent activity |
+| A fast operational overview | A live dashboard with runtime status, KPI summaries, recent activity, and automatic refresh when workspace data changes |
 
 ## Core workflow
 
@@ -97,7 +104,7 @@ MavyClaw is built around a simple operational loop:
 
 ![MavyClaw dashboard preview](docs/assets/dashboard-screenshot.png)
 
-The dashboard gives a fast operational read on scenario volume, run activity, lessons, reviews, safety checks, and recent benchmark movement.
+The dashboard gives a fast operational read on scenario volume, run activity, lessons, reviews, safety checks, and recent benchmark movement, and it now refreshes automatically after authenticated workspace changes.
 
 ### Benchmark runs
 
@@ -207,7 +214,7 @@ MavyClaw is a strong fit for:
 - engineering managers who want clearer operational evidence
 - teams designing safer workflows for agent execution
 
-It is a poor fit if you are specifically looking for a fully finished enterprise platform with production persistence, authentication, role management, and complete multi-user workflows already built out.
+It is a poor fit if you are specifically looking for a fully finished enterprise platform with SSO, directory sync, audit trails, approval orchestration, and complete multi-user administration already built out.
 
 ## Why not just start from scratch
 
@@ -256,6 +263,8 @@ MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
 - structured flows across scenarios, runs, safety checks, lessons, and reviews
 - request validation for create and update flows
 - runtime visibility through `/api/health` and `/api/stats`
+- baseline session access with `viewer`, `editor`, and `admin` roles
+- live dashboard refresh through `/api/live` server events after authenticated workspace changes
 - PostgreSQL-backed persistence when `DATABASE_URL` is available
 - file-backed persistence as a safe fallback when Postgres is not configured
 - full workspace export/import for backup and portability
@@ -264,12 +273,12 @@ MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
 
 ### Next maturity step
 
-- authentication and multi-user collaboration are still missing
+- richer run analytics and approval workflows can still go further
 - scenario-specific test depth can still go further
-- richer migrations and stricter relational constraints can still be added
-- full production hardening remains future work
+- formal database migrations and stricter relational constraints can still be added
+- stronger production packaging and environment management remain future work
 
-That makes the repo strong for internal evaluation, demos, product exploration, and extension work today, while still leaving clear room for a more enterprise-ready next version.
+That makes the repo strong for internal evaluation, guarded operator workflows, demos, product exploration, and extension work today, while still leaving clear room for a more enterprise-ready next version.
 
 ---
 
@@ -281,7 +290,7 @@ That makes the repo strong for internal evaluation, demos, product exploration, 
 - TanStack Query for data fetching
 - Tailwind CSS and Radix UI for interface primitives
 - Zod-based request validation
-- runtime-aware health and stats endpoints
+- runtime-aware health, session, live-update, and stats endpoints
 - PostgreSQL runtime auto-activation when `DATABASE_URL` is present
 - file-backed persistence fallback for production-style runs without Postgres
 - GitHub Actions CI for typecheck, build, and smoke validation
@@ -333,6 +342,15 @@ Supported environment variables:
 - `STORAGE_BACKEND`
 - `DATA_FILE`
 - `DATABASE_URL`
+- `AUTH_MODE`
+- `SESSION_SECRET`
+- `COOKIE_SECURE`
+- `DEMO_AUTH_USERNAME`
+- `DEMO_AUTH_PASSWORD`
+- `DEMO_AUTH_ROLE`
+- `AUTH_USERNAME`
+- `AUTH_PASSWORD`
+- `AUTH_ROLE`
 
 `STORAGE_BACKEND` accepts `memory`, `file`, or `postgres`.
 
@@ -345,13 +363,27 @@ PORT=5000
 STORAGE_BACKEND=memory
 DATA_FILE=.runtime/mavyclaw-data.json
 DATABASE_URL=postgresql://user:password@host:5432/dbname
+AUTH_MODE=demo
+SESSION_SECRET=change-this-session-secret
+COOKIE_SECURE=false
+DEMO_AUTH_USERNAME=demo-admin
+DEMO_AUTH_PASSWORD=demo-admin
+DEMO_AUTH_ROLE=admin
 ```
 
 Important note:
 
 Development defaults to seeded in-memory storage for fast iteration. When `DATABASE_URL` is present, the app now switches to PostgreSQL runtime automatically and reports `runtime: postgres` with `persistence: database` in `/api/health` and `/api/stats`. If PostgreSQL is not configured in production, the app falls back to file-backed persistence, which keeps created records across restarts.
 
-For VPS and reverse-proxy deployments, prefer `HOST=127.0.0.1` so the app stays internal and is published through Nginx, Caddy, or a secure tunnel instead of exposing the raw application port.
+For VPS and reverse-proxy deployments, prefer `HOST=127.0.0.1` so the app stays internal and is published through Nginx, Caddy, or a secure tunnel instead of exposing the raw application port. Set `TRUST_PROXY=1` and leave `COOKIE_SECURE=auto` so browser sessions keep working correctly behind HTTPS termination.
+
+The app now includes baseline session access with role-based write protection:
+
+- `AUTH_MODE=demo` enables a simple session login backed by environment credentials
+- `AUTH_MODE=configured` requires explicit operator credentials in the environment
+- `AUTH_MODE=open` disables the gate and should be reserved for intentionally open environments
+- `viewer` is read-only, `editor` can create and update workspace records, and `admin` also controls workspace import
+- `COOKIE_SECURE=true` should be used when the app is published through HTTPS, while localhost and internal HTTP-only proxy hops can keep it `false`
 
 ---
 
@@ -360,6 +392,10 @@ For VPS and reverse-proxy deployments, prefer `HOST=127.0.0.1` so the app stays 
 Current API surface includes routes for:
 
 - `/api/health`
+- `/api/session`
+- `/api/session/login`
+- `/api/session/logout`
+- `/api/live`
 - `/api/workspace/export`
 - `/api/workspace/import`
 - `/api/scenarios`
@@ -369,7 +405,7 @@ Current API surface includes routes for:
 - `/api/reviews`
 - `/api/stats`
 
-The API currently includes basic payload validation for create and update flows, runtime health and persistence reporting through `/api/health` and `/api/stats`, and full workspace export/import for easier backup and portability.
+The API currently includes basic payload validation for create and update flows, runtime health and persistence reporting through `/api/health` and `/api/stats`, baseline session auth with role-based write protection, a live workspace event stream through `/api/live`, and full workspace export/import for easier backup and portability.
 
 ## Public docs
 
@@ -380,18 +416,25 @@ Additional public repo documents:
 - [Contributing guide](CONTRIBUTING.md)
 - [Roadmap](ROADMAP.md)
 
-Helper scripts for VPS-oriented agents:
+Helper scripts and portable setup files for VPS-oriented agents:
 
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
+- `deploy/verify-deployment.sh`
+- `deploy/env.local.example`
+- `deploy/env.vps-file.example`
+- `deploy/env.vps-postgres.example`
+- `deploy/env.public-direct.example`
 
 The helpers are intentionally conservative:
 
 - the install helper targets Debian or Ubuntu style hosts with `apt-get` and `systemd`
 - the proxy helpers expect a local upstream such as `127.0.0.1:5000`
+- the proxy helpers keep `/api/live` compatible with streaming updates
 - the proxy helpers validate config and roll back if reload fails
 - the install helper preserves an existing `.env` unless overwrite is explicitly requested
+- the env templates give separate starting points for local development, VPS file mode, VPS PostgreSQL mode, and intentionally direct public binding
 
 ## Design principles
 
@@ -409,12 +452,12 @@ MavyClaw is built around a few practical ideas:
 
 MavyClaw is already usable today, and the next high-value upgrades are straightforward:
 
-- auth and role-based access
 - richer run analytics and approval workflows
 - stronger production packaging and environment management
 - formal database migrations and stricter relational constraints
+- deeper multi-user administration, auditability, and SSO-style access management
 
-That is a much shorter list than before because PostgreSQL runtime, file persistence fallback, and workspace portability are already built into the current public version.
+That is a much shorter list than before because baseline session auth, role-based write protection, live dashboard refresh, PostgreSQL runtime, file persistence fallback, and workspace portability are already built into the current public version.
 
 ## Safety note
 

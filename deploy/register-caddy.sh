@@ -62,6 +62,10 @@ write_candidate_config() {
 
 ${DOMAIN} {
     encode gzip zstd
+    @live path /api/live
+    reverse_proxy @live ${UPSTREAM_HOST}:${UPSTREAM_PORT} {
+        flush_interval -1
+    }
     reverse_proxy ${UPSTREAM_HOST}:${UPSTREAM_PORT}
 }
 EOF
@@ -91,6 +95,7 @@ main() {
   reload_with_rollback
 
   echo "Caddy config registered for ${DOMAIN} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}"
+  echo "The generated config keeps /api/live streaming so live dashboard updates continue to work."
 }
 
 main "$@"

@@ -22,6 +22,7 @@ Runtime behavior must be verified through these endpoints after startup:
 
 - `GET /api/health`
 - `GET /api/stats`
+- authenticated browser access through the intended published route when the service is meant to be used remotely
 
 Agents must not claim a successful deployment until `/api/health` reports the expected runtime and persistence mode.
 
@@ -35,6 +36,10 @@ Agents must set or evaluate these environment variables:
 - `STORAGE_BACKEND`
 - `DATA_FILE`
 - `DATABASE_URL`
+- `AUTH_MODE`
+- `SESSION_SECRET`
+- `TRUST_PROXY`
+- `COOKIE_SECURE`
 
 Recommended production defaults:
 
@@ -44,6 +49,10 @@ HOST=127.0.0.1
 PORT=5000
 STORAGE_BACKEND=file
 DATA_FILE=.runtime/mavyclaw-data.json
+AUTH_MODE=demo
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
 ```
 
 If PostgreSQL is available and intended, agents should prefer:
@@ -54,6 +63,10 @@ HOST=127.0.0.1
 PORT=5000
 STORAGE_BACKEND=postgres
 DATABASE_URL=postgresql://user:password@host:5432/dbname
+AUTH_MODE=demo
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
 ```
 
 ## Binding and network policy
@@ -69,6 +82,7 @@ For public access, publish MavyClaw through one of these:
 - Nginx reverse proxy
 - Caddy reverse proxy
 - secure tunnel such as Cloudflare Tunnel
+- direct public binding only when the operator explicitly accepts the reduced safety posture
 
 ### Firewall expectation
 
@@ -202,6 +216,11 @@ Agents should also consult:
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
+- `deploy/verify-deployment.sh`
+- `deploy/env.local.example`
+- `deploy/env.vps-file.example`
+- `deploy/env.vps-postgres.example`
+- `deploy/env.public-direct.example`
 - `deploy/nginx/mavyclaw.conf.example`
 - `deploy/caddy/Caddyfile.example`
 - `deploy/cloudflare/cloudflared-config.example.yml`

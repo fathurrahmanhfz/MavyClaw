@@ -11,9 +11,11 @@ import { ClipboardCheck, AlertTriangle, Plus, ChevronDown, ChevronUp } from "luc
 import type { Review } from "@shared/schema";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function Reviews() {
   const { toast } = useToast();
+  const { canWrite } = useAuth();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -75,11 +77,19 @@ export default function Reviews() {
             Structured reflection after each important technical task
           </p>
         </div>
-        <Button size="sm" onClick={() => setShowForm(!showForm)} data-testid="button-create-review">
+        <Button size="sm" onClick={() => setShowForm(!showForm)} disabled={!canWrite} data-testid="button-create-review">
           <Plus className="w-4 h-4 mr-1" />
           New Review
         </Button>
       </div>
+
+      {!canWrite ? (
+        <Card className="bg-card border-card-border">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Your current role is read-only. Sign in as an editor or admin to save reviews.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showForm && (
         <Card className="bg-card border-card-border" data-testid="form-create-review">

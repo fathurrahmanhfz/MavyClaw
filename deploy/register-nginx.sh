@@ -61,6 +61,20 @@ server {
     listen [::]:80;
     server_name ${DOMAIN};
 
+    location = /api/live {
+        proxy_pass http://${UPSTREAM_HOST}:${UPSTREAM_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+
     location / {
         proxy_pass http://${UPSTREAM_HOST}:${UPSTREAM_PORT};
         proxy_http_version 1.1;
@@ -108,6 +122,7 @@ main() {
   reload_with_rollback
 
   echo "Nginx config registered for ${DOMAIN} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}"
+  echo "The generated config keeps /api/live unbuffered so live dashboard updates continue to work."
   echo "Add TLS separately or switch to Caddy if you want automatic HTTPS."
 }
 
