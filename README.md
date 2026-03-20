@@ -9,303 +9,40 @@
 
 ## A benchmark operations workspace for AI agent teams
 
-Organize benchmark scenarios, track runs, review safety decisions, capture lessons learned, and close the loop with structured post-task reviews.
+Track benchmark scenarios, execution runs, safety decisions, lessons learned, and post-task reviews in one operational workspace.
 
 </div>
 
 ---
 
-## What MavyClaw is
+## What you get
 
-MavyClaw is a benchmark operations workspace for teams that have outgrown ad hoc benchmarking in chat threads, scattered notes, and one-off spreadsheets.
+MavyClaw is a working benchmark ops application for teams running AI agents against real tasks.
 
-If your team runs agent benchmarks, evaluates execution quality, makes safety-sensitive decisions, reviews failures, and wants reusable operational memory, MavyClaw gives you a concrete starting point instead of a blank canvas.
+It gives you:
+
+- a structured scenario catalog
+- run tracking with evidence and operator notes
+- a lightweight safety gate before risky actions
+- lessons learned and post-task reviews
+- a dashboard that reflects backend data and refreshes live after authenticated workspace changes
+- baseline session access with `viewer`, `editor`, and `admin` roles
+- portable deployment paths for local development, VPS file mode, VPS PostgreSQL mode, and direct public binding when explicitly accepted
+
+This repo is meant to be useful immediately, not just serve as a UI mockup.
 
 ## Why this repo matters
 
-Most agent teams eventually run into the same problems:
-
-- benchmark scenarios live in too many places
-- run history is incomplete or inconsistent
-- safety decisions happen in chat and disappear later
-- lessons from failures never become reusable process knowledge
-- post-task reviews have no standard format
-- dashboards are built too late, after the operational data is already messy
-
-MavyClaw pulls those workflows into one app with a structure that is already useful from the start.
-
-This repository is valuable if you want to:
-- stand up an internal benchmark ops workspace quickly
-- publish it safely for remote browser access on a VPS or cloud host
-- understand the shape of a practical agent operations product
-- use a real working baseline instead of inventing the entire model from scratch
-- extend a lightweight prototype into a more tailored internal system
-
-## Agent deployment contract
-
-If an AI agent is given this repository URL for installation or VPS setup, it should treat this repo as both the application and the deployment contract.
-
-The short rule is:
-
-- run MavyClaw on an internal host and port by default
-- publish it through Nginx, Caddy, or a secure tunnel when remote browser access is needed
-- verify `/api/health` and `/api/stats` before claiming success
-- prefer file or PostgreSQL persistence for production-style setups
-- set `TRUST_PROXY=1` and `COOKIE_SECURE=auto` when HTTPS is terminated by a reverse proxy or tunnel
-- do not expose the raw app port publicly unless that risk is explicitly accepted
-
-Reference files for agents:
-
-- [Deployment contract](docs/deployment-contract.md)
-- [Agent setup playbook](docs/agent-setup-playbook.md)
-- `deploy/install-vps.sh`
-- `deploy/register-nginx.sh`
-- `deploy/register-caddy.sh`
-- `deploy/verify-deployment.sh`
-- `deploy/env.local.example`
-- `deploy/env.vps-file.example`
-- `deploy/env.vps-postgres.example`
-- `deploy/env.public-direct.example`
-- [Nginx example](deploy/nginx/mavyclaw.conf.example)
-- [Caddy example](deploy/caddy/Caddyfile.example)
-- [Cloudflare Tunnel example](deploy/cloudflare/cloudflared-config.example.yml)
-- [systemd service example](deploy/systemd/mavyclaw.service.example)
-
----
-
-## Quick value snapshot
-
-| You need | MavyClaw gives you |
-| --- | --- |
-| A place to define evaluation scenarios | A structured scenario catalog with objectives, acceptance criteria, safe steps, anti-patterns, and evidence targets |
-| A better way to record benchmark execution | Benchmark runs with statuses, operator notes, evidence, and linked safety decisions |
-| A pre-action safety workflow | Safety checks for environment, action mode, affected assets, recovery path, and gate decision |
-| A place to retain failure knowledge | Lessons learned with taxonomy, root cause, prevention, and promotion level |
-| A consistent review format | Post-task reviews with final result, evidence, what worked, what failed, and safest next step |
-| A fast operational overview | A live dashboard with runtime status, KPI summaries, recent activity, and automatic refresh when workspace data changes |
-
-## Core workflow
-
-MavyClaw is built around a simple operational loop:
-
-1. Define benchmark scenarios.
-2. Run the benchmark against a selected scenario.
-3. Record status, evidence, and operator notes.
-4. Apply a safety gate before risky actions.
-5. Capture lessons learned from failures or near-misses.
-6. Complete a structured post-task review.
-7. Monitor aggregate signals from the dashboard.
-
----
-
-## Product preview
-
-### Dashboard
-
-![MavyClaw dashboard preview](docs/assets/dashboard-screenshot.png)
-
-The dashboard gives a fast operational read on scenario volume, run activity, lessons, reviews, safety checks, and recent benchmark movement, and it now refreshes automatically after authenticated workspace changes.
-
-### Benchmark runs
-
-![MavyClaw benchmark runs preview](docs/assets/runs-screenshot.png)
-
-The runs page makes it easier to review benchmark execution history, execution status, operator notes, and linked evidence in one place.
-
----
-
-## Feature map
-
-### Scenario catalog
-Create and review benchmark scenarios with fields that are actually useful in operational work:
-
-- title and description
-- category and difficulty
-- readiness state
-- objective
-- acceptance criteria
-- safe steps
-- anti-patterns
-- verification checklist
-- target evidence
-- primary risk
-
-### Benchmark runs
-Track the lifecycle of benchmark execution from planning to outcome.
-
-You can:
-- create a new run
-- assign it to a scenario
-- update run status
-- store operator notes
-- attach evidence
-- sync safety decisions to related runs
-
-### Safety gate
-Use a lightweight safety review before actions with real operational risk.
-
-Safety checks include:
-- target environment
-- action mode
-- affected assets
-- minimum verification
-- recovery path
-- gate decision
-- decision rationale
-
-### Lessons learned
-Turn failures into reusable knowledge instead of isolated incidents.
-
-Lessons can capture:
-- context
-- symptom
-- root cause
-- impact
-- prevention
-- status
-- taxonomy
-- promotion level
-
-### Post-task review
-Close the loop with a structured review record.
-
-Reviews include:
-- task goal
-- final result
-- result status
-- verification evidence
-- what worked
-- what failed
-- near-miss
-- safest next step
-
-### Dashboard
-Get a fast operational read on the workspace through:
-- total scenarios
-- total runs
-- total lessons
-- total reviews
-- total safety checks
-- run status distribution
-- lesson status distribution
-- error category breakdown
-- recent benchmark runs
-
----
-
-## Example use cases
-
-MavyClaw is especially useful for teams that want to operationalize work like:
-
-- benchmarking internal coding agents across realistic engineering scenarios
-- tracking infrastructure troubleshooting runs and their outcomes
-- reviewing risky write operations before execution
-- capturing repeated operational failures and turning them into reusable playbooks
-- building a safer review loop around benchmark-driven agent deployment
-- creating internal evidence trails for evaluation and iteration
-
-## Who this is for
-
-MavyClaw is a strong fit for:
-
-- AI agent ops teams
-- evaluation and benchmarking teams
-- internal tooling teams
-- engineering managers who want clearer operational evidence
-- teams designing safer workflows for agent execution
-
-It is a poor fit if you are specifically looking for a fully finished enterprise platform with SSO, directory sync, audit trails, approval orchestration, and complete multi-user administration already built out.
-
-## Why not just start from scratch
-
-Starting from scratch sounds clean, but in practice it often leads to:
-
-- inconsistent terminology across teams
-- unclear run states
-- weak or missing safety review practices
-- lessons that never become process improvements
-- dashboards bolted on too late
-- no stable operational data model
-
-MavyClaw gives you a ready-made structure that you can run, inspect, and extend immediately.
-
----
-
-## Architecture at a glance
-
-```text
-                        +----------------------+
-                        |      Dashboard       |
-                        | stats, status, recaps|
-                        +----------+-----------+
-                                   |
-                                   v
-+----------------+      +----------+-----------+      +-------------------+
-|   Scenarios    | ---> |      Benchmark Runs  | <--- |    Safety Gate    |
-| catalog + risk |      | status, notes, proof |      | review + decision |
-+----------------+      +----------+-----------+      +-------------------+
-                                   |
-                                   v
-                        +----------+-----------+
-                        | Lessons + Reviews    |
-                        | memory + closure     |
-                        +----------------------+
-```
-
-## Repository status
-
-MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
-
-### Strong today
-
-- working frontend and backend application structure
-- seeded workspace data for immediate exploration
-- structured flows across scenarios, runs, safety checks, lessons, and reviews
-- request validation for create and update flows
-- runtime visibility through `/api/health` and `/api/stats`
-- baseline session access with `viewer`, `editor`, and `admin` roles
-- live dashboard refresh through `/api/live` server events after authenticated workspace changes
-- PostgreSQL-backed persistence when `DATABASE_URL` is available
-- file-backed persistence as a safe fallback when Postgres is not configured
-- full workspace export/import for backup and portability
-- repeatable smoke tests for development, file runtime, and PostgreSQL runtime checks
-- CI that runs typecheck, build, and smoke validation
-
-### Next maturity step
-
-- richer run analytics and approval workflows can still go further
-- scenario-specific test depth can still go further
-- formal database migrations and stricter relational constraints can still be added
-- stronger production packaging and environment management remain future work
-
-That makes the repo strong for internal evaluation, guarded operator workflows, demos, product exploration, and extension work today, while still leaving clear room for a more enterprise-ready next version.
-
----
-
-## Technical highlights
-
-- TypeScript full-stack application
-- React frontend with Vite
-- Express API backend
-- TanStack Query for data fetching
-- Tailwind CSS and Radix UI for interface primitives
-- Zod-based request validation
-- runtime-aware health, session, live-update, and stats endpoints
-- PostgreSQL runtime auto-activation when `DATABASE_URL` is present
-- file-backed persistence fallback for production-style runs without Postgres
-- GitHub Actions CI for typecheck, build, and smoke validation
-
-## Project structure
-
-```text
-client/        React frontend
-server/        Express API and runtime entrypoint
-shared/        Shared schema and types
-docs/assets/   Public README screenshots
-script/        Build scripts
-```
-
----
+Most teams hit the same problems when they start benchmarking agents seriously:
+
+- scenarios are scattered across chats, docs, and spreadsheets
+- run history is inconsistent or incomplete
+- risky decisions happen in chat and disappear later
+- failures do not become reusable operational knowledge
+- dashboards show output metrics but not process quality
+- deployments work on one machine and become ambiguous for everyone else
+
+MavyClaw gives you a baseline that already includes product structure, runtime verification, role protection, and a deployment contract for future operators or AI agents.
 
 ## Quick start
 
@@ -313,9 +50,9 @@ script/        Build scripts
 
 - Node.js 20+
 - npm 10+
-- PostgreSQL-compatible database only if you want the PostgreSQL runtime path
+- PostgreSQL only if you want the PostgreSQL runtime path
 
-### Local setup
+### Local development
 
 ```bash
 git clone https://github.com/fathurrahmanhfz/MavyClaw.git
@@ -325,6 +62,15 @@ cp .env.example .env
 npm run dev
 ```
 
+Open `http://127.0.0.1:5000`.
+
+Default demo credentials from `.env.example`:
+
+- username: `demo-admin`
+- password: `demo-admin`
+
+Change those credentials before any shared or public deployment.
+
 ### Production build
 
 ```bash
@@ -332,18 +78,150 @@ npm run build
 npm run start
 ```
 
-## Environment variables
+### Recommended verification
 
-Supported environment variables:
+Run these in order:
 
+```bash
+npm run check
+npm run build
+npm run smoke:prod
+npm run smoke:dev
+```
+
+If PostgreSQL is intentionally configured:
+
+```bash
+npm run smoke:postgres
+```
+
+## Product preview
+
+### Dashboard
+
+![MavyClaw dashboard preview](docs/assets/dashboard-screenshot.png)
+
+The dashboard shows current runtime state, KPI summaries, recent activity, and live refresh behavior when authenticated users change workspace data.
+
+### Benchmark runs
+
+![MavyClaw benchmark runs preview](docs/assets/runs-screenshot.png)
+
+The runs page tracks execution status, operator notes, and evidence in one place.
+
+## Core workflow
+
+1. Define benchmark scenarios.
+2. Run work against a chosen scenario.
+3. Record evidence, status, and operator notes.
+4. Apply a safety gate before risky actions.
+5. Capture lessons learned from failures and near-misses.
+6. Close the loop with a structured review.
+7. Watch aggregate signals on the dashboard.
+
+## Deployment profiles
+
+| Profile | Best for | Storage | Publish strategy |
+| --- | --- | --- | --- |
+| Local development | Fast iteration | `memory` | local only |
+| VPS file mode | Single-host durable setup | `file` | Nginx, Caddy, or tunnel |
+| VPS PostgreSQL mode | Production-style persistence | `postgres` | Nginx, Caddy, or tunnel |
+| Direct public binding | Short-lived evaluation only | `file` or `postgres` | public app port with explicit risk acceptance |
+
+Ready-to-copy templates:
+
+- `deploy/env.local.example`
+- `deploy/env.vps-file.example`
+- `deploy/env.vps-postgres.example`
+- `deploy/env.public-direct.example`
+
+## Safe remote access
+
+The safest default is:
+
+- bind the app internally with `HOST=127.0.0.1`
+- keep `PORT=5000`
+- publish through Nginx, Caddy, or Cloudflare Tunnel
+- set `TRUST_PROXY=1` when HTTPS is terminated by a reverse proxy or tunnel
+- leave `COOKIE_SECURE=auto` for proxy-aware session behavior
+- avoid exposing the raw app port unless the operator explicitly accepts that risk
+
+This repo already includes proxy-safe handling for the live dashboard stream on `/api/live`, so live refresh keeps working behind Nginx and Caddy.
+
+## For AI agents
+
+If an AI agent is given this repository URL, it should treat the repo as both:
+
+- the application to install
+- the deployment contract to follow
+
+Minimum expected agent behavior:
+
+1. Clone the repo and install dependencies.
+2. Choose the intended runtime profile.
+3. Copy the matching env template or `.env.example` into `.env`.
+4. Set real credentials and a strong `SESSION_SECRET`.
+5. Run `npm run check`, `npm run build`, and the relevant smoke test.
+6. Start the app behind a process supervisor for VPS deployments.
+7. Verify `/api/health` and `/api/stats` before claiming success.
+8. Attach Nginx, Caddy, or a secure tunnel for remote browser access.
+9. Validate the published route honestly.
+
+Reference documents and helpers:
+
+- [Deployment contract](docs/deployment-contract.md)
+- [Agent setup playbook](docs/agent-setup-playbook.md)
+- `deploy/install-vps.sh`
+- `deploy/register-nginx.sh`
+- `deploy/register-caddy.sh`
+- `deploy/verify-deployment.sh`
+- `deploy/nginx/mavyclaw.conf.example`
+- `deploy/caddy/Caddyfile.example`
+- `deploy/cloudflare/cloudflared-config.example.yml`
+- `deploy/systemd/mavyclaw.service.example`
+
+## Runtime and auth
+
+### Storage modes
+
+`STORAGE_BACKEND` accepts:
+
+- `memory` for fast local iteration
+- `file` for disk-backed persistence without PostgreSQL
+- `postgres` for database-backed persistence
+
+Runtime is visible through:
+
+- `GET /api/health`
+- `GET /api/stats`
+
+### Auth modes
+
+`AUTH_MODE` accepts:
+
+- `demo` for guarded demo or single-operator setups
+- `configured` for explicit environment-defined credentials
+- `open` for intentionally open environments only
+
+Roles:
+
+- `viewer` is read-only
+- `editor` can create and update workspace records
+- `admin` can also import workspace data
+
+## Important environment variables
+
+Core variables:
+
+- `NODE_ENV`
 - `HOST`
 - `PORT`
-- `NODE_ENV`
 - `STORAGE_BACKEND`
 - `DATA_FILE`
 - `DATABASE_URL`
 - `AUTH_MODE`
 - `SESSION_SECRET`
+- `TRUST_PROXY`
 - `COOKIE_SECURE`
 - `DEMO_AUTH_USERNAME`
 - `DEMO_AUTH_PASSWORD`
@@ -352,44 +230,39 @@ Supported environment variables:
 - `AUTH_PASSWORD`
 - `AUTH_ROLE`
 
-`STORAGE_BACKEND` accepts `memory`, `file`, or `postgres`.
-
-Example:
+Production-style file example:
 
 ```env
-NODE_ENV=development
+NODE_ENV=production
 HOST=127.0.0.1
 PORT=5000
-STORAGE_BACKEND=memory
+STORAGE_BACKEND=file
 DATA_FILE=.runtime/mavyclaw-data.json
-DATABASE_URL=postgresql://user:password@host:5432/dbname
 AUTH_MODE=demo
-SESSION_SECRET=change-this-session-secret
-COOKIE_SECURE=false
-DEMO_AUTH_USERNAME=demo-admin
-DEMO_AUTH_PASSWORD=demo-admin
-DEMO_AUTH_ROLE=admin
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
+DEMO_AUTH_PASSWORD=replace-with-a-strong-password
 ```
 
-Important note:
+Production-style PostgreSQL example:
 
-Development defaults to seeded in-memory storage for fast iteration. When `DATABASE_URL` is present, the app now switches to PostgreSQL runtime automatically and reports `runtime: postgres` with `persistence: database` in `/api/health` and `/api/stats`. If PostgreSQL is not configured in production, the app falls back to file-backed persistence, which keeps created records across restarts.
+```env
+NODE_ENV=production
+HOST=127.0.0.1
+PORT=5000
+STORAGE_BACKEND=postgres
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+AUTH_MODE=demo
+SESSION_SECRET=replace-with-a-long-random-secret
+TRUST_PROXY=1
+COOKIE_SECURE=auto
+DEMO_AUTH_PASSWORD=replace-with-a-strong-password
+```
 
-For VPS and reverse-proxy deployments, prefer `HOST=127.0.0.1` so the app stays internal and is published through Nginx, Caddy, or a secure tunnel instead of exposing the raw application port. Set `TRUST_PROXY=1` and leave `COOKIE_SECURE=auto` so browser sessions keep working correctly behind HTTPS termination.
+## API surface
 
-The app now includes baseline session access with role-based write protection:
-
-- `AUTH_MODE=demo` enables a simple session login backed by environment credentials
-- `AUTH_MODE=configured` requires explicit operator credentials in the environment
-- `AUTH_MODE=open` disables the gate and should be reserved for intentionally open environments
-- `viewer` is read-only, `editor` can create and update workspace records, and `admin` also controls workspace import
-- `COOKIE_SECURE=true` should be used when the app is published through HTTPS, while localhost and internal HTTP-only proxy hops can keep it `false`
-
----
-
-## API notes
-
-Current API surface includes routes for:
+Current API routes include:
 
 - `/api/health`
 - `/api/session`
@@ -405,59 +278,55 @@ Current API surface includes routes for:
 - `/api/reviews`
 - `/api/stats`
 
-The API currently includes basic payload validation for create and update flows, runtime health and persistence reporting through `/api/health` and `/api/stats`, baseline session auth with role-based write protection, a live workspace event stream through `/api/live`, and full workspace export/import for easier backup and portability.
+## Technical highlights
+
+- TypeScript full-stack application
+- React frontend with Vite
+- Express backend
+- TanStack Query for data fetching
+- Zod-based request validation
+- session auth with role-based write protection
+- live dashboard refresh through `/api/live`
+- PostgreSQL runtime auto-activation when `DATABASE_URL` is present unless overridden
+- file-backed persistence fallback for production-style setups without PostgreSQL
+- workspace export and import for portability
+- repeatable smoke tests for development, file runtime, and PostgreSQL runtime
+- CI for typecheck, build, and smoke validation
+
+## Project structure
+
+```text
+client/        React frontend
+server/        Express API and runtime entrypoint
+shared/        Shared schema and types
+docs/assets/   Public README screenshots
+script/        Build and verification scripts
+deploy/        VPS, proxy, env, and verification helpers
+```
 
 ## Public docs
-
-Additional public repo documents:
 
 - [Deployment contract](docs/deployment-contract.md)
 - [Agent setup playbook](docs/agent-setup-playbook.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Roadmap](ROADMAP.md)
 
-Helper scripts and portable setup files for VPS-oriented agents:
+## Repository status
 
-- `deploy/install-vps.sh`
-- `deploy/register-nginx.sh`
-- `deploy/register-caddy.sh`
-- `deploy/verify-deployment.sh`
-- `deploy/env.local.example`
-- `deploy/env.vps-file.example`
-- `deploy/env.vps-postgres.example`
-- `deploy/env.public-direct.example`
+MavyClaw is already usable today for:
 
-The helpers are intentionally conservative:
+- internal benchmark operations work
+- guarded operator workflows
+- demos and product exploration
+- VPS-hosted remote browser access through a safer reverse-proxy path
+- extension into a more tailored internal system
 
-- the install helper targets Debian or Ubuntu style hosts with `apt-get` and `systemd`
-- the proxy helpers expect a local upstream such as `127.0.0.1:5000`
-- the proxy helpers keep `/api/live` compatible with streaming updates
-- the proxy helpers validate config and roll back if reload fails
-- the install helper preserves an existing `.env` unless overwrite is explicitly requested
-- the env templates give separate starting points for local development, VPS file mode, VPS PostgreSQL mode, and intentionally direct public binding
+Remaining maturity work still available:
 
-## Design principles
-
-MavyClaw is built around a few practical ideas:
-
-- benchmark work should be structured, not improvised
-- safety review should be visible, not implicit
-- failures should become reusable knowledge
-- post-task reflection should produce operational improvement
-- dashboards should reflect process data, not just output metrics
-
----
-
-## Next maturity moves
-
-MavyClaw is already usable today, and the next high-value upgrades are straightforward:
-
-- richer run analytics and approval workflows
+- richer analytics and approval workflows
 - stronger production packaging and environment management
 - formal database migrations and stricter relational constraints
-- deeper multi-user administration, auditability, and SSO-style access management
-
-That is a much shorter list than before because baseline session auth, role-based write protection, live dashboard refresh, PostgreSQL runtime, file persistence fallback, and workspace portability are already built into the current public version.
+- deeper multi-user administration and enterprise access control
 
 ## Safety note
 
