@@ -513,6 +513,94 @@ async function run() {
     });
     assert(doubleCancel.response.status === 409, `Expected 409 for double-cancel, got ${doubleCancel.response.status}`);
 
+    // ── Approval workflow smoke coverage ─────────────────────────────────────
+
+    // Create a fresh run to test the approval workflow.
+    const approvalRun = await fetchJson("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "sc-001",
+        status: "running",
+        operatorNote: "Approval workflow smoke test",
+        evidence: null,
+        safetyDecision: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    assert(approvalRun.response.status === 201, `Approval run creation failed: ${approvalRun.text}`);
+    const approvalRunId = approvalRun.body.id;
+
+    // Manually put run into pending-approval via PATCH.
+    const setApprovalPending = await fetchJson(`/api/runs/${approvalRunId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "pending-approval" }),
+    });
+    assert(setApprovalPending.response.ok, `Setting pending-approval status failed: ${setApprovalPending.text}`);
+    assert(setApprovalPending.body.status === "pending-approval", "Run status was not set to pending-approval");
+
+    // Approve the run — should transition to 'running'.
+    const approveResult = await fetchJson(`/api/runs/${approvalRunId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: "Looks safe, proceeding" }),
+    });
+    assert(approveResult.response.ok, `Run approve failed: ${approveResult.text}`);
+    assert(approveResult.body.status === "running", `Expected approved run to be 'running', got '${approveResult.body.status}'`);
+    assert(approveResult.body.approvalNote === "Looks safe, proceeding", "Approval note not stored");
+
+    // Approving a non-pending-approval run should return 409.
+    const badApprove = await fetchJson(`/api/runs/${approvalRunId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert(badApprove.response.status === 409, `Expected 409 for approve on non-pending-approval run, got ${badApprove.response.status}`);
+
+    // Create a second run and test rejection.
+    const rejectRun = await fetchJson("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "sc-001",
+        status: "pending-approval",
+        operatorNote: "Rejection smoke test",
+        evidence: null,
+        safetyDecision: "hold-for-approval",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    assert(rejectRun.response.status === 201, `Rejection run creation failed: ${rejectRun.text}`);
+    const rejectRunId = rejectRun.body.id;
+
+    const rejectResult = await fetchJson(`/api/runs/${rejectRunId}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: "Too risky for this environment" }),
+    });
+    assert(rejectResult.response.ok, `Run reject failed: ${rejectResult.text}`);
+    assert(rejectResult.body.status === "failed", `Expected rejected run to be 'failed', got '${rejectResult.body.status}'`);
+    assert(rejectResult.body.approvalNote === "Too risky for this environment", "Rejection note not stored");
+
+    // Rejecting a non-pending-approval run should return 409.
+    const badReject = await fetchJson(`/api/runs/${rejectRunId}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert(badReject.response.status === 409, `Expected 409 for reject on non-pending-approval run, got ${badReject.response.status}`);
+
+    // Check activity log has approval events.
+    const activityAfterApproval = await fetchJson("/api/activity?entityType=run");
+    assert(activityAfterApproval.response.ok, `Activity log fetch after approval failed: ${activityAfterApproval.text}`);
+    const approvedEntry = activityAfterApproval.body.find((e) => e.action === "run.approved");
+    assert(Boolean(approvedEntry), "Expected run.approved activity log entry after approval");
+    const rejectedEntry = activityAfterApproval.body.find((e) => e.action === "run.rejected");
+    assert(Boolean(rejectedEntry), "Expected run.rejected activity log entry after rejection");
+
     // 3. PATCH /api/lessons/:id — partial lesson update
     const allLessons = await fetchJson("/api/lessons");
     assert(allLessons.body.length > 0, "Expected at least one lesson for PATCH test");

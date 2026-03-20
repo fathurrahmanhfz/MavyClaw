@@ -170,6 +170,7 @@ export class MemStorage implements IStorage {
       operatorNote: r.operatorNote ?? null,
       evidence: r.evidence ?? null,
       safetyDecision: r.safetyDecision ?? null,
+      approvalNote: r.approvalNote ?? null,
     };
     this.runs.set(id, run);
     this.persistSnapshot();

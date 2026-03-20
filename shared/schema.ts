@@ -28,10 +28,11 @@ export type Scenario = typeof scenarios.$inferSelect;
 export const runs = pgTable("runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scenarioId: varchar("scenario_id").notNull(),
-  status: text("status").notNull(), // planned | running | blocked | passed | failed
+  status: text("status").notNull(), // planned | running | blocked | pending-approval | passed | failed
   operatorNote: text("operator_note"),
   evidence: text("evidence"),
   safetyDecision: text("safety_decision"), // allow-read-only | allow-guarded-write | hold-for-approval | deny
+  approvalNote: text("approval_note"), // populated when a run is approved or rejected
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

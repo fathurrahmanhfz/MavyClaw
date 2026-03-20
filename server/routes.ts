@@ -75,6 +75,7 @@ function normalizeSnapshot(snapshot: z.infer<typeof snapshotSchema>): StorageSna
       operatorNote: run.operatorNote ?? null,
       evidence: run.evidence ?? null,
       safetyDecision: run.safetyDecision ?? null,
+      approvalNote: (run as any).approvalNote ?? null,
     })),
     safetyChecks: snapshot.safetyChecks.map((check) => ({
       ...check,
@@ -239,10 +240,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: `Run with ID ${parsed.data.runId} was not found` });
       }
 
-      await storage.updateRun(parsed.data.runId, {
+      // When a safety check yields hold-for-approval, automatically move the
+      // run into pending-approval so operators can act on it via the dashboard.
+      const runPatch: Partial<import("@shared/schema").InsertRun> = {
         safetyDecision: parsed.data.decision,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      if (parsed.data.decision === "hold-for-approval" && run.status !== "pending-approval") {
+        runPatch.status = "pending-approval";
+      }
+      await storage.updateRun(parsed.data.runId, runPatch);
       publishWorkspaceEvent("run-updated");
     }
 
@@ -395,6 +402,55 @@ export async function registerRoutes(
     res.json(run);
   });
 
+  // POST /api/runs/:id/approve — approve a run that is in pending-approval state.
+  // The run transitions to 'running' so execution can continue. An optional
+  // approval_note is recorded and a log entry is written.
+  app.post("/api/runs/:id/approve", requireRole("editor"), async (req, res, next) => {
+    const runId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getRun(runId);
+    if (!existing) return next(new HttpError(404, "Run not found"));
+
+    if (existing.status !== "pending-approval") {
+      return next(new HttpError(409, `Run is not in 'pending-approval' state (current: '${existing.status}')`))
+    }
+
+    const note = typeof req.body?.note === "string" && req.body.note.trim()
+      ? req.body.note.trim()
+      : "Approved by operator";
+    const run = await storage.updateRun(runId, {
+      status: "running",
+      approvalNote: note,
+      updatedAt: new Date().toISOString(),
+    });
+    publishWorkspaceEvent("run-updated");
+    logActivity("run.approved", "run", runId, `Run approved: '${note}'`, note);
+    res.json(run);
+  });
+
+  // POST /api/runs/:id/reject — reject a run that is in pending-approval state.
+  // The run transitions to 'failed'. An optional rejection note is recorded.
+  app.post("/api/runs/:id/reject", requireRole("editor"), async (req, res, next) => {
+    const runId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const existing = await storage.getRun(runId);
+    if (!existing) return next(new HttpError(404, "Run not found"));
+
+    if (existing.status !== "pending-approval") {
+      return next(new HttpError(409, `Run is not in 'pending-approval' state (current: '${existing.status}')`))
+    }
+
+    const note = typeof req.body?.note === "string" && req.body.note.trim()
+      ? req.body.note.trim()
+      : "Rejected by operator";
+    const run = await storage.updateRun(runId, {
+      status: "failed",
+      approvalNote: note,
+      updatedAt: new Date().toISOString(),
+    });
+    publishWorkspaceEvent("run-updated");
+    logActivity("run.rejected", "run", runId, `Run rejected: '${note}'`, note);
+    res.json(run);
+  });
+
   app.get("/api/safety-checks", async (_req, res) => {
     const checks = await storage.getSafetyChecks();
     res.json(checks);
@@ -418,10 +474,15 @@ export async function registerRoutes(
         return res.status(400).json({ error: `Run with ID ${runId} was not found` });
       }
 
-      await storage.updateRun(runId, {
+      // Automatically move run to pending-approval if the safety decision requires it.
+      const runPatch: Partial<import("@shared/schema").InsertRun> = {
         safetyDecision: decision,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      if (decision === "hold-for-approval" && run.status !== "pending-approval") {
+        runPatch.status = "pending-approval";
+      }
+      await storage.updateRun(runId, runPatch);
     }
 
     const check = await storage.createSafetyCheck({

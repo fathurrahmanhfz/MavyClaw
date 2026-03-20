@@ -13,8 +13,9 @@ import {
   ShieldCheck,
   TrendingUp,
   AlertTriangle,
+  Activity,
 } from "lucide-react";
-import type { Run } from "@shared/schema";
+import type { Run, ActivityLog } from "@shared/schema";
 import { useLiveUpdates } from "@/lib/live";
 
 interface Stats {
@@ -46,6 +47,14 @@ export default function Dashboard() {
     queryKey: ["/api/stats"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/stats");
+      return res.json();
+    },
+  });
+
+  const { data: activityEntries, isLoading: activityLoading } = useQuery<ActivityLog[]>({
+    queryKey: ["/api/activity"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/activity?limit=20");
       return res.json();
     },
   });
@@ -240,6 +249,54 @@ export default function Dashboard() {
       {stats ? (
         <WorkspacePortabilityCard runtime={stats.runtime} persistence={stats.persistence} />
       ) : null}
+
+      <Card className="bg-card border-card-border" data-testid="activity-feed-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Recent Activity
+            {liveEnabled && (
+              <span className="text-[10px] font-normal text-muted-foreground ml-auto">live</span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activityLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : activityEntries?.length ? (
+            <div className="space-y-1" data-testid="activity-feed-list">
+              {activityEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-start justify-between gap-3 py-1.5 px-2 rounded-md hover:bg-accent/30 transition-colors"
+                  data-testid={`activity-entry-${entry.id}`}
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="font-mono text-[11px] text-primary shrink-0 mt-0.5">{entry.action}</span>
+                    <span className="text-sm text-muted-foreground truncate">{entry.summary}</span>
+                  </div>
+                  <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+                    {new Date(entry.occurredAt).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center" data-testid="empty-activity">
+              No activity yet
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="bg-card border-card-border">
         <CardHeader className="pb-3">

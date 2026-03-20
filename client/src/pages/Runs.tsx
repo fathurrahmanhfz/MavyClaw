@@ -71,6 +71,32 @@ export default function Runs() {
     },
   });
 
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, note }: { id: string; note?: string }) => {
+      const res = await apiRequest("POST", `/api/runs/${id}/approve`, { note });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+      toast({ title: "Approved", description: "Run approved and resumed" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, note }: { id: string; note?: string }) => {
+      const res = await apiRequest("POST", `/api/runs/${id}/reject`, { note });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activity"] });
+      toast({ title: "Rejected", description: "Run rejected" });
+    },
+  });
+
   const scenarioMap = new Map((scenarios || []).map((s) => [s.id, s]));
 
   if (error) {
@@ -218,9 +244,42 @@ export default function Runs() {
                           </div>
                         </div>
                       )}
+                      {(run as any).approvalNote && (
+                        <div>
+                          <span className="text-xs font-medium text-muted-foreground">Approval Note</span>
+                          <p className="text-sm mt-1" data-testid={`text-approval-note-${run.id}`}>{(run as any).approvalNote}</p>
+                        </div>
+                      )}
+
+                      {run.status === "pending-approval" && canWrite && (
+                        <div className="rounded-md border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
+                          <p className="text-xs font-medium text-violet-400">This run requires operator approval before it can continue.</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
+                              disabled={approveMutation.isPending || rejectMutation.isPending}
+                              onClick={() => approveMutation.mutate({ id: run.id })}
+                              data-testid={`button-approve-${run.id}`}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="text-xs h-7"
+                              disabled={approveMutation.isPending || rejectMutation.isPending}
+                              onClick={() => rejectMutation.mutate({ id: run.id })}
+                              data-testid={`button-reject-${run.id}`}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-2 pt-2">
-                        {["planned", "running", "blocked", "passed", "failed"].map((s) => (
+                        {["planned", "running", "blocked", "pending-approval", "passed", "failed"].map((s) => (
                           <Button
                             key={s}
                             variant={run.status === s ? "default" : "outline"}

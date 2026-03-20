@@ -16,6 +16,7 @@ const liveQueryKeys = [
   ["/api/safety-checks"],
   ["/api/lessons"],
   ["/api/reviews"],
+  ["/api/activity"],
 ] as const;
 
 export function LiveUpdatesProvider({ children }: { children: React.ReactNode }) {

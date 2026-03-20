@@ -24,9 +24,10 @@ It gives you:
 - a structured scenario catalog
 - run tracking with evidence and operator notes
 - a lightweight safety gate before risky actions
+- **approval workflow for risky runs**: runs that receive a `hold-for-approval` safety decision automatically enter `pending-approval` state, and operators can approve or reject them via the dashboard or API
 - lessons learned and post-task reviews
 - token-based agent ingest for machine-to-machine lifecycle updates
-- a dashboard that reflects backend data and refreshes live after authenticated workspace changes
+- a dashboard that reflects backend data and refreshes live after authenticated workspace changes, including a **recent activity feed** powered by the activity log API
 - baseline session access with `viewer`, `editor`, and `admin` roles
 - portable deployment paths for local development, VPS file mode, VPS PostgreSQL mode, and direct public binding when explicitly accepted
 
@@ -135,9 +136,12 @@ The runs page tracks execution status, operator notes, and evidence in one place
 2. Run work against a chosen scenario.
 3. Record evidence, status, and operator notes.
 4. Apply a safety gate before risky actions.
+   - If the safety decision is `hold-for-approval`, the run enters `pending-approval` state.
+   - An operator approves or rejects the run via `POST /api/runs/:id/approve` or `POST /api/runs/:id/reject`.
+   - Approval resumes the run (`running`); rejection terminates it (`failed`).
 5. Capture lessons learned from failures and near-misses.
 6. Close the loop with a structured review.
-7. Watch aggregate signals on the dashboard.
+7. Watch aggregate signals and the recent activity feed on the dashboard.
 
 ## Deployment profiles
 
@@ -323,12 +327,44 @@ Current API routes include:
 - `/api/live`
 - `/api/workspace/export`
 - `/api/workspace/import`
-- `/api/scenarios`
-- `/api/runs`
-- `/api/safety-checks`
-- `/api/lessons`
-- `/api/reviews`
+- `/api/activity` — recent activity feed; supports `?entityType=`, `?entityId=`, `?limit=` filters
+- `/api/activity/:id`
+- `/api/scenarios` (GET, POST, PATCH)
+- `/api/runs` (GET, POST, PATCH)
+- `/api/runs/:id/cancel` — cancel any non-terminal run
+- `/api/runs/:id/approve` — approve a `pending-approval` run; transitions to `running`
+- `/api/runs/:id/reject` — reject a `pending-approval` run; transitions to `failed`
+- `/api/safety-checks` (GET, POST)
+- `/api/lessons` (GET, POST, PATCH)
+- `/api/reviews` (GET, POST, PATCH)
 - `/api/stats`
+- `/api/agent/status`
+- `/api/agent/run/start`
+- `/api/agent/run/progress`
+- `/api/agent/run/finish`
+- `/api/agent/safety-check`
+- `/api/agent/lesson`
+- `/api/agent/review`
+
+### Approval workflow
+
+When a safety check is submitted with `decision: "hold-for-approval"` (via the UI or agent ingest), the linked run automatically transitions to `pending-approval` status. From there:
+
+```bash
+# Approve — resumes the run (status → running)
+curl -X POST http://127.0.0.1:5000/api/runs/<runId>/approve \
+  -H 'Content-Type: application/json' \
+  -b <session-cookie> \
+  -d '{"note": "Reviewed and approved"}'
+
+# Reject — terminates the run (status → failed)
+curl -X POST http://127.0.0.1:5000/api/runs/<runId>/reject \
+  -H 'Content-Type: application/json' \
+  -b <session-cookie> \
+  -d '{"note": "Too risky for current environment"}'
+```
+
+Both endpoints require the `editor` role. Attempting to approve or reject a run that is not in `pending-approval` returns `409`. The decision and note are written to the activity log and visible in the run detail view.
 
 ## Technical highlights
 
@@ -338,11 +374,13 @@ Current API routes include:
 - TanStack Query for data fetching
 - Zod-based request validation
 - session auth with role-based write protection
-- live dashboard refresh through `/api/live`
+- live dashboard refresh through `/api/live`; the activity feed also refreshes live when authenticated
+- lightweight approval workflow: `pending-approval` run state, approve/reject endpoints, automatic transition on `hold-for-approval` safety checks
+- dashboard recent activity feed reading from `/api/activity` with live refresh on `activity-log-created` SSE events
 - PostgreSQL runtime auto-activation when `DATABASE_URL` is present unless overridden
 - file-backed persistence fallback for production-style setups without PostgreSQL
 - workspace export and import for portability
-- repeatable smoke tests for development, file runtime, and PostgreSQL runtime
+- repeatable smoke tests for development, file runtime, and PostgreSQL runtime (includes approval workflow coverage)
 - CI for typecheck, build, and smoke validation
 
 ## Project structure
@@ -375,7 +413,7 @@ MavyClaw is already usable today for:
 
 Remaining maturity work still available:
 
-- richer analytics and approval workflows
+- richer analytics and reporting
 - stronger production packaging and environment management
 - formal database migrations and stricter relational constraints
 - deeper multi-user administration and enterprise access control
