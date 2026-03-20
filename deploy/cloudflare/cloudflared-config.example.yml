@@ -1,0 +1,11 @@
+# Example Cloudflare Tunnel configuration for publishing MavyClaw safely.
+# Replace the placeholders before use.
+# Ingress-based configs must end with a catch-all rule.
+
+tunnel: YOUR_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  - hostname: mavyclaw.example.com
+    service: http://127.0.0.1:5000
+  - service: http_status:404

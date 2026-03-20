@@ -201,5 +201,7 @@ Agents should also consult:
 
 - `deploy/nginx/mavyclaw.conf.example`
 - `deploy/caddy/Caddyfile.example`
+- `deploy/cloudflare/cloudflared-config.example.yml`
 - `deploy/systemd/mavyclaw.service.example`
+- `docs/agent-setup-playbook.md`
 - `README.md`

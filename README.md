@@ -55,8 +55,10 @@ The short rule is:
 Reference files for agents:
 
 - [Deployment contract](docs/deployment-contract.md)
+- [Agent setup playbook](docs/agent-setup-playbook.md)
 - [Nginx example](deploy/nginx/mavyclaw.conf.example)
 - [Caddy example](deploy/caddy/Caddyfile.example)
+- [Cloudflare Tunnel example](deploy/cloudflare/cloudflared-config.example.yml)
 - [systemd service example](deploy/systemd/mavyclaw.service.example)
 
 ---
@@ -371,6 +373,7 @@ The API currently includes basic payload validation for create and update flows,
 Additional public repo documents:
 
 - [Deployment contract](docs/deployment-contract.md)
+- [Agent setup playbook](docs/agent-setup-playbook.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Roadmap](ROADMAP.md)
 
