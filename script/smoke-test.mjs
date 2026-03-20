@@ -16,6 +16,7 @@ const databaseUrl = mode === "prod-postgres"
 const demoAuthUsername = process.env.DEMO_AUTH_USERNAME || "demo-admin";
 const demoAuthPassword = process.env.DEMO_AUTH_PASSWORD || "demo-admin";
 const demoAuthRole = process.env.DEMO_AUTH_ROLE || "admin";
+const agentIngestToken = process.env.AGENT_INGEST_TOKEN || `smoke-agent-token-${mode}`;
 
 function assert(condition, message) {
   if (!condition) {
@@ -146,6 +147,8 @@ function startServer() {
     DEMO_AUTH_PASSWORD: demoAuthPassword,
     DEMO_AUTH_ROLE: demoAuthRole,
     COOKIE_SECURE: process.env.COOKIE_SECURE || "false",
+    AGENT_INGEST_TOKEN: agentIngestToken,
+    AGENT_INGEST_BASE_URL: process.env.AGENT_INGEST_BASE_URL || `http://127.0.0.1:${port}`,
   };
 
   if (databaseUrl) {
@@ -283,9 +286,18 @@ async function run() {
       assert(health.body.dataFile === dataFile, `Expected data file ${dataFile}, received ${health.body.dataFile}`);
     }
 
+    const agentStatus = await fetchJson("/api/agent/status");
+    assert(agentStatus.response.ok, `Agent status failed: ${agentStatus.text}`);
+    assert(agentStatus.body.configured === true, "Expected agent ingest to be configured in smoke mode");
+    assert(agentStatus.body.mode === "token", `Expected token mode, received ${agentStatus.body.mode}`);
+
     const statsBefore = await fetchJson("/api/stats");
     assert(statsBefore.response.ok, `Stats failed: ${statsBefore.text}`);
+    assert(statsBefore.body.agentIngest.configured === true, "Expected stats to expose configured agent ingest");
     const runsBefore = statsBefore.body.totalRuns;
+    const lessonsBefore = statsBefore.body.totalLessons;
+    const reviewsBefore = statsBefore.body.totalReviews;
+    const safetyBefore = statsBefore.body.totalSafetyChecks;
 
     const liveUpdatePromise = expectLiveWorkspaceUpdate();
 
@@ -311,9 +323,134 @@ async function run() {
     const statsAfterCreate = await fetchJson("/api/stats");
     assert(statsAfterCreate.body.totalRuns === runsBefore + 1, "Run count did not increment after create");
 
+    const helperRunStart = spawn(process.execPath, [resolve(rootDir, "script/agent-ingest.mjs"), "run-start", "--json", JSON.stringify({
+      taskTitle: `Agent helper smoke ${mode}`,
+      operatorNote: "Agent helper started a run",
+      evidence: "Agent helper smoke evidence",
+      safetyDecision: "allow-read-only"
+    })], {
+      cwd: rootDir,
+      env: {
+        ...process.env,
+        AGENT_INGEST_TOKEN: agentIngestToken,
+        AGENT_INGEST_BASE_URL: `http://127.0.0.1:${port}`,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let helperStdout = "";
+    let helperStderr = "";
+    for await (const chunk of helperRunStart.stdout) {
+      helperStdout += chunk.toString();
+    }
+    for await (const chunk of helperRunStart.stderr) {
+      helperStderr += chunk.toString();
+    }
+    const helperExitCode = await new Promise((resolve) => helperRunStart.on("close", resolve));
+    assert(helperExitCode === 0, `Agent helper failed: ${helperStderr}`);
+    const helperResponse = JSON.parse(helperStdout);
+    assert(helperResponse.ok === true, "Expected helper command to succeed");
+    const agentRunId = helperResponse.body.id;
+    assert(agentRunId, "Expected helper command to return a run id");
+
+    const progressResponse = await fetch(`http://127.0.0.1:${port}/api/agent/run/progress`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        runId: agentRunId,
+        status: "blocked",
+        operatorNote: "Waiting on smoke verification",
+      }),
+    });
+    assert(progressResponse.ok, `Agent progress failed: ${await progressResponse.text()}`);
+
+    const safetyResponse = await fetch(`http://127.0.0.1:${port}/api/agent/safety-check`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        runId: agentRunId,
+        targetEnv: "sandbox",
+        actionMode: "write",
+        affectedAssets: "Smoke dataset",
+        minVerification: "Run smoke assertions",
+        recoveryPath: "Delete the smoke records",
+        decision: "allow-guarded-write",
+        reason: "Smoke path only touches test data",
+      }),
+    });
+    assert(safetyResponse.ok, `Agent safety check failed: ${await safetyResponse.text()}`);
+
+    const lessonResponse = await fetch(`http://127.0.0.1:${port}/api/agent/lesson`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        title: "Smoke lesson",
+        context: "Agent ingest smoke verification",
+        taxonomyL1: "workflow",
+        taxonomyL2: "workflow/agent-ingest",
+        symptom: "Need confidence that token-based ingest works",
+        rootCause: "New helper and endpoints were added",
+        impact: "Would lose agent lifecycle records without verification",
+        prevention: "Keep smoke coverage for the ingest path",
+        status: "verified",
+        promotion: "workflow",
+      }),
+    });
+    assert(lessonResponse.ok, `Agent lesson failed: ${await lessonResponse.text()}`);
+
+    const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/agent/review`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        runId: agentRunId,
+        taskGoal: "Verify agent ingest smoke path",
+        finalResult: "The helper and token-based endpoints completed successfully",
+        resultStatus: "completed",
+        evidence: "Smoke assertions passed across all ingest endpoints",
+        whatWorked: "Single helper command for start, direct token posts for follow-up events",
+        whatFailed: "No failure during smoke verification",
+        nearMiss: "Could have shipped the helper without end-to-end coverage",
+        safestNextStep: "Keep the ingest path covered in smoke tests",
+      }),
+    });
+    assert(reviewResponse.ok, `Agent review failed: ${await reviewResponse.text()}`);
+
+    const finishResponse = await fetch(`http://127.0.0.1:${port}/api/agent/run/finish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        runId: agentRunId,
+        status: "passed",
+        operatorNote: "Smoke verification complete",
+        evidence: "Agent ingest helper and endpoints passed",
+      }),
+    });
+    assert(finishResponse.ok, `Agent finish failed: ${await finishResponse.text()}`);
+
+    const statsAfterAgentFlow = await fetchJson("/api/stats");
+    assert(statsAfterAgentFlow.body.totalRuns === runsBefore + 2, "Expected agent flow to add one more run");
+    assert(statsAfterAgentFlow.body.totalSafetyChecks === safetyBefore + 1, "Expected agent flow to add one safety check");
+    assert(statsAfterAgentFlow.body.totalLessons === lessonsBefore + 1, "Expected agent flow to add one lesson");
+    assert(statsAfterAgentFlow.body.totalReviews === reviewsBefore + 1, "Expected agent flow to add one review");
+
     const exported = await fetchJson("/api/workspace/export");
     assert(exported.response.ok, `Workspace export failed: ${exported.text}`);
-    assert(exported.body.snapshot.runs.length === runsBefore + 1, "Exported snapshot did not include the created run");
+    assert(exported.body.snapshot.runs.length === runsBefore + 2, "Exported snapshot did not include the created runs");
 
     const filteredSnapshot = {
       ...exported.body.snapshot,

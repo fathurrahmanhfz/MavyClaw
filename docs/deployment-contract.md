@@ -48,7 +48,8 @@ Before claiming success, the agent must decide and record:
 2. Whether the host is local-only, internal VPS, or public-facing.
 3. Which publish path is used: Nginx, Caddy, Cloudflare Tunnel, or direct public binding.
 4. Which process supervisor keeps the app running.
-5. Which verification commands were run.
+5. Whether token-based agent ingest is expected and configured.
+6. Which verification commands were run.
 
 ## Runtime rules
 
@@ -83,12 +84,12 @@ An agent should follow this order:
 1. Clone the repository.
 2. Install dependencies with `npm install`.
 3. Copy `.env.example` or the matching env template into `.env`.
-4. Set real credentials and a strong `SESSION_SECRET`.
+4. Set real credentials, a strong `SESSION_SECRET`, and `AGENT_INGEST_TOKEN` when external agents will write records.
 5. Run `npm run check`.
 6. Run `npm run build`.
 7. Run the relevant smoke test.
 8. Start the app with `npm run start` or a process supervisor.
-9. Verify `/api/health` and `/api/stats` locally.
+9. Verify `/api/health`, `/api/stats`, and `/api/agent/status` locally.
 10. Attach a reverse proxy or secure tunnel if remote access is intended.
 11. Validate the published route honestly.
 
@@ -102,6 +103,7 @@ Agents should complete all applicable checks:
 - `npm run smoke:postgres` when PostgreSQL is intentionally configured
 - local `GET /api/health` returns `200`
 - local `GET /api/stats` returns `200`
+- local `GET /api/agent/status` returns `200`
 - public route resolves and loads when remote publishing is intended
 - HTTPS works when configured
 
@@ -153,6 +155,28 @@ For VPS deployments, agents should prefer:
 - another managed process runner with restart and logs
 
 The process should restart automatically after reboot or crash.
+
+## Agent ingest contract
+
+When MavyClaw is intended to receive records from another agent runtime, the default write path is the token-protected `/api/agent/*` surface.
+
+Supported endpoints:
+
+- `POST /api/agent/run/start`
+- `POST /api/agent/run/progress`
+- `POST /api/agent/safety-check`
+- `POST /api/agent/lesson`
+- `POST /api/agent/review`
+- `POST /api/agent/run/finish`
+- `GET /api/agent/status`
+
+Preferred helper command:
+
+```bash
+npm run agent:ingest -- <event> --payload-file <file.json>
+```
+
+Agents should prefer this machine-to-machine path over manual UI submission whenever they are executing benchmark work automatically.
 
 ## Workspace portability
 

@@ -10,6 +10,7 @@ const LiveContext = createContext<LiveContextValue>({ enabled: false });
 
 const liveQueryKeys = [
   ["/api/stats"],
+  ["/api/agent/status"],
   ["/api/scenarios"],
   ["/api/runs"],
   ["/api/safety-checks"],

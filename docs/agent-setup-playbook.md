@@ -31,6 +31,7 @@ Given only the repository URL, an agent should be able to:
 - publish it with a sane security posture
 - verify the runtime honestly
 - leave behind a maintainable setup
+- post lifecycle records automatically through the token-based ingest path
 
 ## Decision order
 
@@ -139,6 +140,8 @@ Before start, confirm these values intentionally:
 - `SESSION_SECRET`
 - `TRUST_PROXY`
 - `COOKIE_SECURE`
+- `AGENT_INGEST_TOKEN`
+- `AGENT_INGEST_BASE_URL`
 
 ### File-backed production example
 
@@ -191,6 +194,7 @@ After the app is running, verify locally:
 ```bash
 curl http://127.0.0.1:5000/api/health
 curl http://127.0.0.1:5000/api/stats
+curl http://127.0.0.1:5000/api/agent/status
 BASE_URL=http://127.0.0.1:5000 EXPECTED_RUNTIME=file EXPECTED_PERSISTENCE=disk bash deploy/verify-deployment.sh
 ```
 
@@ -198,6 +202,7 @@ Expected outcome:
 
 - file deployments report `runtime: file` and `persistence: disk`
 - PostgreSQL deployments report `runtime: postgres` and `persistence: database`
+- `/api/agent/status` reports `configured: true` when machine-to-machine ingest is intended
 - memory mode is acceptable only for local development
 
 ## Publish the service
@@ -254,6 +259,24 @@ Use it only when the operator explicitly accepts the trade-off, and then:
 - use a strong password
 - limit firewall exposure to the intended app port
 - prefer a short-lived evaluation environment
+
+## Agent lifecycle write path
+
+When another AI agent is executing work against this deployment, default to:
+
+```bash
+npm run agent:ingest -- run-start --payload-file payload.json
+```
+
+Then continue with:
+
+- `run-progress`
+- `safety-check`
+- `lesson`
+- `review`
+- `run-finish`
+
+This avoids manual UI entry and keeps the dashboard in sync through live updates.
 
 ## Public verification
 

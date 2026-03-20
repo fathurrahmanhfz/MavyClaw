@@ -15,6 +15,7 @@ import {
   type Review,
   type InsertReview,
 } from "@shared/schema";
+import { getAgentIntegrationStatus } from "./agent";
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
@@ -24,11 +25,21 @@ import { Pool } from "pg";
 
 export type StorageRuntime = "memory" | "file" | "postgres";
 
+export interface AgentIntegrationStatus {
+  configured: boolean;
+  mode: "disabled" | "token";
+  endpointPrefix: string;
+  helperCommand: string;
+  authHeader: string | null;
+  baseUrlHint: string | null;
+}
+
 export interface StorageRuntimeInfo {
   runtime: StorageRuntime;
   persistence: "ephemeral" | "disk" | "database";
   databaseConfigured: boolean;
   dataFile: string | null;
+  agentIngest: AgentIntegrationStatus;
 }
 
 export interface StorageSnapshot {
@@ -197,6 +208,7 @@ export class MemStorage implements IStorage {
       persistence: "ephemeral",
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       dataFile: null,
+      agentIngest: getAgentIntegrationStatus(),
     };
   }
 
@@ -661,6 +673,7 @@ class FileStorage extends MemStorage {
       persistence: "disk",
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       dataFile: this.filePath,
+      agentIngest: getAgentIntegrationStatus(),
     };
   }
 
@@ -725,6 +738,7 @@ class PostgresStorage extends MemStorage {
       persistence: "database",
       databaseConfigured: true,
       dataFile: null,
+      agentIngest: getAgentIntegrationStatus(),
     };
   }
 

@@ -43,6 +43,29 @@ Prefer these publish modes in this order:
 
 Do not default to exposing the raw app port directly to the internet.
 
+## Agent ingest default contract
+
+When this repository is used by another AI agent for task execution, default to the token-based ingest path instead of manual UI entry.
+
+Expected machine-to-machine flow:
+
+1. set `AGENT_INGEST_TOKEN`
+2. optionally set `AGENT_INGEST_BASE_URL`
+3. start work with `POST /api/agent/run/start`
+4. record progress with `POST /api/agent/run/progress`
+5. record risky actions with `POST /api/agent/safety-check`
+6. record failures and reusable learning with `POST /api/agent/lesson`
+7. close the loop with `POST /api/agent/review`
+8. finish the run with `POST /api/agent/run/finish`
+
+Preferred helper command:
+
+```bash
+npm run agent:ingest -- <event> --payload-file <file.json>
+```
+
+Do not treat the dashboard as the primary write path for external agent workflows when token-based ingest is available.
+
 ## Required verification
 
 Before claiming success, complete these checks:
@@ -52,7 +75,8 @@ Before claiming success, complete these checks:
 3. the relevant smoke test through the bootstrap path
 4. local `/api/health`
 5. local `/api/stats`
-6. published route verification when remote access is intended
+6. local `/api/agent/status` when agent ingest is expected
+7. published route verification when remote access is intended
 
 ## Required reporting
 

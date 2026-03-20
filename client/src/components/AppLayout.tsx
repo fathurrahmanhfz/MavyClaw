@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import AppSidebar from "./AppSidebar";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PerplexityAttribution } from "./PerplexityAttribution";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,9 +27,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {children}
           </div>
-          <footer className="px-4 py-4 text-center">
-            <PerplexityAttribution />
-          </footer>
         </main>
       </div>
     </div>

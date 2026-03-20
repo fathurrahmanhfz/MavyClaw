@@ -10,6 +10,21 @@ import {
   insertSafetyCheckSchema,
   insertScenarioSchema,
 } from "@shared/schema";
+import {
+  agentLessonSchema,
+  agentReviewSchema,
+  agentRunFinishSchema,
+  agentRunProgressSchema,
+  agentRunStartSchema,
+  agentSafetyCheckSchema,
+  buildAgentScenario,
+  requireAgentIngest,
+  toInsertLessonFromAgent,
+  toInsertReviewFromAgent,
+  toInsertRunFromAgentStart,
+  toInsertSafetyCheckFromAgent,
+  toRunPatchFromAgentProgress,
+} from "./agent";
 import { storage, type StorageSnapshot } from "./storage";
 
 const runUpdateSchema = insertRunSchema
@@ -91,6 +106,7 @@ export async function registerRoutes(
       persistence: runtimeInfo.persistence,
       databaseConfigured: runtimeInfo.databaseConfigured,
       dataFile: runtimeInfo.dataFile,
+      agentIngest: runtimeInfo.agentIngest,
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
     });
@@ -121,6 +137,105 @@ export async function registerRoutes(
       runtime: runtimeInfo.runtime,
       importedAt: new Date().toISOString(),
     });
+  });
+
+  app.get("/api/agent/status", async (_req, res) => {
+    const runtimeInfo = await storage.getRuntimeInfo();
+    res.json(runtimeInfo.agentIngest);
+  });
+
+  app.post("/api/agent/run/start", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentRunStartSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    let scenarioId = parsed.data.scenarioId;
+
+    if (scenarioId) {
+      const existingScenario = await storage.getScenario(scenarioId);
+      if (!existingScenario) {
+        return res.status(400).json({ error: `Scenario with ID ${scenarioId} was not found` });
+      }
+    } else {
+      const scenario = await storage.createScenario(
+        buildAgentScenario(parsed.data.scenario, parsed.data.taskTitle, parsed.data.scenarioId),
+      );
+      scenarioId = scenario.id;
+      publishWorkspaceEvent("scenario-created");
+    }
+
+    const run = await storage.createRun(toInsertRunFromAgentStart(parsed.data, scenarioId));
+    publishWorkspaceEvent("run-created");
+    res.status(201).json(run);
+  });
+
+  app.post("/api/agent/run/progress", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentRunProgressSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const run = await storage.updateRun(parsed.data.runId, toRunPatchFromAgentProgress(parsed.data));
+    if (!run) return res.status(404).json({ error: "Run not found" });
+    publishWorkspaceEvent("run-updated");
+    res.json(run);
+  });
+
+  app.post("/api/agent/safety-check", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentSafetyCheckSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    if (parsed.data.runId) {
+      const run = await storage.getRun(parsed.data.runId);
+      if (!run) {
+        return res.status(400).json({ error: `Run with ID ${parsed.data.runId} was not found` });
+      }
+
+      await storage.updateRun(parsed.data.runId, {
+        safetyDecision: parsed.data.decision,
+        updatedAt: new Date().toISOString(),
+      });
+      publishWorkspaceEvent("run-updated");
+    }
+
+    const check = await storage.createSafetyCheck(toInsertSafetyCheckFromAgent(parsed.data));
+    publishWorkspaceEvent("safety-check-created");
+    res.status(201).json(check);
+  });
+
+  app.post("/api/agent/lesson", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentLessonSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const lesson = await storage.createLesson(toInsertLessonFromAgent(parsed.data));
+    publishWorkspaceEvent("lesson-created");
+    res.status(201).json(lesson);
+  });
+
+  app.post("/api/agent/review", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentReviewSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    if (parsed.data.runId) {
+      const run = await storage.getRun(parsed.data.runId);
+      if (!run) {
+        return res.status(400).json({ error: `Run with ID ${parsed.data.runId} was not found` });
+      }
+    }
+
+    const review = await storage.createReview(toInsertReviewFromAgent(parsed.data));
+    publishWorkspaceEvent("review-created");
+    res.status(201).json(review);
+  });
+
+  app.post("/api/agent/run/finish", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentRunFinishSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    const run = await storage.updateRun(
+      parsed.data.runId,
+      toRunPatchFromAgentProgress(parsed.data, parsed.data.status ?? "passed"),
+    );
+    if (!run) return res.status(404).json({ error: "Run not found" });
+    publishWorkspaceEvent("run-updated");
+    res.json(run);
   });
 
   app.get("/api/scenarios", async (_req, res) => {
@@ -281,6 +396,7 @@ export async function registerRoutes(
       runtime: runtimeInfo.runtime,
       persistence: runtimeInfo.persistence,
       databaseConfigured: runtimeInfo.databaseConfigured,
+      agentIngest: runtimeInfo.agentIngest,
       totalScenarios: scenarios.length,
       totalRuns: runs.length,
       totalLessons: lessons.length,

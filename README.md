@@ -25,6 +25,7 @@ It gives you:
 - run tracking with evidence and operator notes
 - a lightweight safety gate before risky actions
 - lessons learned and post-task reviews
+- token-based agent ingest for machine-to-machine lifecycle updates
 - a dashboard that reflects backend data and refreshes live after authenticated workspace changes
 - baseline session access with `viewer`, `editor`, and `admin` roles
 - portable deployment paths for local development, VPS file mode, VPS PostgreSQL mode, and direct public binding when explicitly accepted
@@ -105,6 +106,7 @@ npm run check
 npm run build
 npm run smoke:prod
 npm run smoke:dev
+curl http://127.0.0.1:5000/api/agent/status
 ```
 
 If PostgreSQL is intentionally configured:
@@ -172,18 +174,20 @@ If an AI agent is given this repository URL, it should treat the repo as both:
 
 - the application to install
 - the deployment contract to follow
+- the machine-to-machine ingest target for benchmark execution records
 
 Minimum expected agent behavior:
 
 1. Clone the repo and install dependencies.
 2. Choose the intended runtime profile.
 3. Copy the matching env template or `.env.example` into `.env`.
-4. Set real credentials and a strong `SESSION_SECRET`.
+4. Set real credentials, a strong `SESSION_SECRET`, and `AGENT_INGEST_TOKEN`.
 5. Run `npm run check`, `npm run build`, and the relevant smoke test.
 6. Start the app behind a process supervisor for VPS deployments.
-7. Verify `/api/health` and `/api/stats` before claiming success.
+7. Verify `/api/health`, `/api/stats`, and `/api/agent/status` before claiming success.
 8. Attach Nginx, Caddy, or a secure tunnel for remote browser access.
-9. Validate the published route honestly.
+9. Use `npm run agent:ingest -- <event> --payload-file <file.json>` as the default write path for external agent workflows.
+10. Validate the published route honestly.
 
 Reference documents and helpers:
 
@@ -202,6 +206,31 @@ Reference documents and helpers:
 - `deploy/systemd/mavyclaw.service.example`
 
 ## Runtime and auth
+
+## Agent ingest
+
+MavyClaw now includes a token-based ingest layer for external agent workflows.
+
+Set these variables:
+
+- `AGENT_INGEST_TOKEN` for bearer-token authentication to `/api/agent/*`
+- `AGENT_INGEST_BASE_URL` as an optional helper default for external runners
+
+Available endpoints:
+
+- `POST /api/agent/run/start`
+- `POST /api/agent/run/progress`
+- `POST /api/agent/safety-check`
+- `POST /api/agent/lesson`
+- `POST /api/agent/review`
+- `POST /api/agent/run/finish`
+- `GET /api/agent/status`
+
+Default helper:
+
+```bash
+npm run agent:ingest -- run-start --json '{"taskTitle":"Investigate staging issue"}'
+```
 
 ### Storage modes
 
@@ -250,6 +279,8 @@ Core variables:
 - `AUTH_USERNAME`
 - `AUTH_PASSWORD`
 - `AUTH_ROLE`
+- `AGENT_INGEST_TOKEN`
+- `AGENT_INGEST_BASE_URL`
 
 Production-style file example:
 

@@ -21,6 +21,14 @@ interface Stats {
   runtime: string;
   persistence: string;
   databaseConfigured: boolean;
+  agentIngest: {
+    configured: boolean;
+    mode: "disabled" | "token";
+    endpointPrefix: string;
+    helperCommand: string;
+    authHeader: string | null;
+    baseUrlHint: string | null;
+  };
   totalScenarios: number;
   totalRuns: number;
   totalLessons: number;
@@ -89,6 +97,41 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {stats ? (
+          <Card className="bg-card border-card-border lg:col-span-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Agent Integration Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Token-based agent ingest lets external agents create runs, progress updates, safety checks, lessons, and reviews without using the UI.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <p className="font-semibold">{stats.agentIngest.configured ? "Ready" : "Disabled"}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Auth mode</p>
+                  <p className="font-semibold capitalize">{stats.agentIngest.mode}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Endpoint prefix</p>
+                  <p className="font-mono text-xs break-all">{stats.agentIngest.endpointPrefix}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Base URL hint</p>
+                  <p className="font-mono text-xs break-all">{stats.agentIngest.baseUrlHint ?? "Use current app origin"}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-card-border p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Default helper command</p>
+                <p className="font-mono text-xs break-all" data-testid="agent-ingest-helper">{stats.agentIngest.helperCommand}</p>
+                <p className="text-xs text-muted-foreground">Set AGENT_INGEST_TOKEN on the server and use the helper to post lifecycle events into this workspace.</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
         <Card className="bg-card border-card-border lg:col-span-3">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Runtime Readiness</CardTitle>
@@ -99,7 +142,7 @@ export default function Dashboard() {
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
               </div>
             ) : stats ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3" data-testid="runtime-readiness">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3" data-testid="runtime-readiness">
                 <div className="rounded-lg border border-card-border p-3">
                   <p className="text-xs text-muted-foreground mb-1">Active runtime</p>
                   <p className="text-sm font-semibold capitalize" data-testid="runtime-mode">{stats.runtime}</p>
@@ -111,6 +154,10 @@ export default function Dashboard() {
                 <div className="rounded-lg border border-card-border p-3">
                   <p className="text-xs text-muted-foreground mb-1">Database configured</p>
                   <p className="text-sm font-semibold" data-testid="runtime-db-configured">{stats.databaseConfigured ? "Yes" : "No"}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3" data-testid="agent-ingest-state">
+                  <p className="text-xs text-muted-foreground mb-1">Agent ingest</p>
+                  <p className="text-sm font-semibold">{stats.agentIngest.configured ? "Configured" : "Not configured"}</p>
                 </div>
               </div>
             ) : (
