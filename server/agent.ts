@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from "express";
 import { z } from "zod";
 import type {
+  InsertCostEvent,
   InsertLesson,
   InsertReview,
   InsertRun,
@@ -99,6 +100,19 @@ export const agentLessonSchema = z.object({
   prevention: z.string().trim().min(1),
   status: z.enum(["verified", "partial", "hypothesis"]),
   promotion: z.enum(["memory only", "checklist", "workflow", "skill"]),
+  createdAt: z.string().trim().min(1).optional(),
+});
+
+export const agentCostEventSchema = z.object({
+  runId: z.string().trim().min(1).nullable().optional(),
+  provider: z.string().trim().min(1),
+  model: z.string().trim().min(1),
+  promptTokens: z.number().int().nonnegative().optional(),
+  completionTokens: z.number().int().nonnegative().optional(),
+  totalTokens: z.number().int().nonnegative().optional(),
+  // Accept a string or number for estimatedCostUsd; coerce to string for storage
+  estimatedCostUsd: z.union([z.string().trim().min(1), z.number()]).optional(),
+  operationLabel: z.string().trim().min(1).optional(),
   createdAt: z.string().trim().min(1).optional(),
 });
 
@@ -261,6 +275,23 @@ export function toInsertLessonFromAgent(payload: z.infer<typeof agentLessonSchem
     prevention: payload.prevention,
     status: payload.status,
     promotion: payload.promotion,
+    createdAt: payload.createdAt ?? nowIso(),
+  };
+}
+
+export function toInsertCostEventFromAgent(payload: z.infer<typeof agentCostEventSchema>): InsertCostEvent {
+  const estimatedCostUsd = payload.estimatedCostUsd !== undefined
+    ? String(payload.estimatedCostUsd)
+    : undefined;
+  return {
+    runId: payload.runId ?? null,
+    provider: payload.provider,
+    model: payload.model,
+    promptTokens: payload.promptTokens ?? null,
+    completionTokens: payload.completionTokens ?? null,
+    totalTokens: payload.totalTokens ?? null,
+    estimatedCostUsd: estimatedCostUsd ?? null,
+    operationLabel: payload.operationLabel ?? null,
     createdAt: payload.createdAt ?? nowIso(),
   };
 }

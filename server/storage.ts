@@ -5,6 +5,7 @@ import {
   lessons,
   reviews,
   activityLogs,
+  costEvents,
   type Scenario,
   type InsertScenario,
   type Run,
@@ -17,6 +18,8 @@ import {
   type InsertReview,
   type ActivityLog,
   type InsertActivityLog,
+  type CostEvent,
+  type InsertCostEvent,
 } from "@shared/schema";
 import { getAgentIntegrationStatus } from "./agent";
 import { randomUUID } from "crypto";
@@ -52,6 +55,22 @@ export interface StorageSnapshot {
   lessons: Lesson[];
   reviews: Review[];
   activityLogs: ActivityLog[];
+  costEvents: CostEvent[];
+}
+
+export interface CostEventFilter {
+  runId?: string;
+  limit?: number;
+}
+
+export interface CostSummary {
+  totalEvents: number;
+  totalTokens: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  estimatedTotalCostUsd: number;
+  byModel: Record<string, { events: number; tokens: number; estimatedCostUsd: number }>;
+  byProvider: Record<string, { events: number; tokens: number; estimatedCostUsd: number }>;
 }
 
 export interface ActivityLogFilter {
@@ -70,6 +89,47 @@ function defaultDataFilePath() {
 
 function stripUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
+function buildCostSummary(events: CostEvent[], filterRunId?: string): CostSummary {
+  const filtered = filterRunId ? events.filter((e) => e.runId === filterRunId) : events;
+  const byModel: CostSummary["byModel"] = {};
+  const byProvider: CostSummary["byProvider"] = {};
+  let totalTokens = 0;
+  let totalPromptTokens = 0;
+  let totalCompletionTokens = 0;
+  let estimatedTotalCostUsd = 0;
+
+  for (const e of filtered) {
+    const t = e.totalTokens ?? 0;
+    const p = e.promptTokens ?? 0;
+    const c = e.completionTokens ?? 0;
+    const cost = e.estimatedCostUsd ? parseFloat(e.estimatedCostUsd) : 0;
+    totalTokens += t;
+    totalPromptTokens += p;
+    totalCompletionTokens += c;
+    estimatedTotalCostUsd += isNaN(cost) ? 0 : cost;
+
+    if (!byModel[e.model]) byModel[e.model] = { events: 0, tokens: 0, estimatedCostUsd: 0 };
+    byModel[e.model].events++;
+    byModel[e.model].tokens += t;
+    byModel[e.model].estimatedCostUsd += isNaN(cost) ? 0 : cost;
+
+    if (!byProvider[e.provider]) byProvider[e.provider] = { events: 0, tokens: 0, estimatedCostUsd: 0 };
+    byProvider[e.provider].events++;
+    byProvider[e.provider].tokens += t;
+    byProvider[e.provider].estimatedCostUsd += isNaN(cost) ? 0 : cost;
+  }
+
+  return {
+    totalEvents: filtered.length,
+    totalTokens,
+    totalPromptTokens,
+    totalCompletionTokens,
+    estimatedTotalCostUsd: Math.round(estimatedTotalCostUsd * 1e6) / 1e6,
+    byModel,
+    byProvider,
+  };
 }
 
 function requestedStorageRuntime(): StorageRuntime {
@@ -124,6 +184,12 @@ export interface IStorage {
   getActivityLogs(filter?: ActivityLogFilter): Promise<ActivityLog[]>;
   getActivityLog(id: string): Promise<ActivityLog | undefined>;
   createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
+
+  // Cost Events
+  getCostEvents(filter?: CostEventFilter): Promise<CostEvent[]>;
+  getCostEvent(id: string): Promise<CostEvent | undefined>;
+  createCostEvent(event: InsertCostEvent): Promise<CostEvent>;
+  getCostSummary(runId?: string): Promise<CostSummary>;
 }
 
 export class MemStorage implements IStorage {
@@ -133,6 +199,7 @@ export class MemStorage implements IStorage {
   protected lessons: Map<string, Lesson> = new Map();
   protected reviews: Map<string, Review> = new Map();
   protected activityLogEntries: Map<string, ActivityLog> = new Map();
+  protected costEventEntries: Map<string, CostEvent> = new Map();
 
   constructor(shouldSeed = true) {
     if (shouldSeed) {
@@ -279,6 +346,44 @@ export class MemStorage implements IStorage {
     return log;
   }
 
+  // ── Cost Events ──
+  async getCostEvents(filter?: CostEventFilter): Promise<CostEvent[]> {
+    let entries = Array.from(this.costEventEntries.values())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    if (filter?.runId) {
+      entries = entries.filter((e) => e.runId === filter.runId);
+    }
+    if (filter?.limit !== undefined && filter.limit > 0) {
+      entries = entries.slice(0, filter.limit);
+    }
+    return entries;
+  }
+
+  async getCostEvent(id: string): Promise<CostEvent | undefined> {
+    return this.costEventEntries.get(id);
+  }
+
+  async createCostEvent(event: InsertCostEvent): Promise<CostEvent> {
+    const id = randomUUID();
+    const ce: CostEvent = {
+      ...event,
+      id,
+      runId: event.runId ?? null,
+      promptTokens: event.promptTokens ?? null,
+      completionTokens: event.completionTokens ?? null,
+      totalTokens: event.totalTokens ?? null,
+      estimatedCostUsd: event.estimatedCostUsd ?? null,
+      operationLabel: event.operationLabel ?? null,
+    };
+    this.costEventEntries.set(id, ce);
+    this.persistSnapshot();
+    return ce;
+  }
+
+  async getCostSummary(runId?: string): Promise<CostSummary> {
+    return buildCostSummary(Array.from(this.costEventEntries.values()), runId);
+  }
+
   async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
     return {
       runtime: "memory",
@@ -310,6 +415,7 @@ export class MemStorage implements IStorage {
       lessons: Array.from(this.lessons.values()),
       reviews: Array.from(this.reviews.values()),
       activityLogs: Array.from(this.activityLogEntries.values()),
+      costEvents: Array.from(this.costEventEntries.values()),
     };
   }
 
@@ -320,6 +426,7 @@ export class MemStorage implements IStorage {
     this.lessons = new Map(snapshot.lessons.map((item) => [item.id, item]));
     this.reviews = new Map(snapshot.reviews.map((item) => [item.id, item]));
     this.activityLogEntries = new Map((snapshot.activityLogs ?? []).map((item) => [item.id, item]));
+    this.costEventEntries = new Map((snapshot.costEvents ?? []).map((item) => [item.id, item]));
   }
 
   // ── Seed ──
@@ -791,6 +898,7 @@ class FileStorage extends MemStorage {
         lessons: parsed.lessons ?? [],
         reviews: parsed.reviews ?? [],
         activityLogs: parsed.activityLogs ?? [],
+        costEvents: (parsed as any).costEvents ?? [],
       });
     } catch {
       this.seed();
@@ -824,13 +932,14 @@ class PostgresStorage extends MemStorage {
 
   override async exportSnapshot(): Promise<StorageSnapshot> {
     await this.ready;
-    const [scenarioRows, runRows, safetyRows, lessonRows, reviewRows, activityRows] = await Promise.all([
+    const [scenarioRows, runRows, safetyRows, lessonRows, reviewRows, activityRows, costRows] = await Promise.all([
       this.db.select().from(scenarios).orderBy(scenarios.id),
       this.db.select().from(runs).orderBy(runs.createdAt),
       this.db.select().from(safetyChecks).orderBy(safetyChecks.createdAt),
       this.db.select().from(lessons).orderBy(lessons.createdAt),
       this.db.select().from(reviews).orderBy(reviews.createdAt),
       this.db.select().from(activityLogs).orderBy(activityLogs.occurredAt),
+      this.db.select().from(costEvents).orderBy(costEvents.createdAt),
     ]);
 
     return {
@@ -840,6 +949,7 @@ class PostgresStorage extends MemStorage {
       lessons: lessonRows,
       reviews: reviewRows,
       activityLogs: activityRows,
+      costEvents: costRows,
     };
   }
 
@@ -848,7 +958,7 @@ class PostgresStorage extends MemStorage {
     await this.pool.query("BEGIN");
 
     try {
-      await this.pool.query("TRUNCATE TABLE activity_logs, reviews, lessons, safety_checks, runs, scenarios");
+      await this.pool.query("TRUNCATE TABLE cost_events, activity_logs, reviews, lessons, safety_checks, runs, scenarios");
 
       if (snapshot.scenarios.length) {
         await this.db.insert(scenarios).values(snapshot.scenarios);
@@ -868,12 +978,58 @@ class PostgresStorage extends MemStorage {
       if (snapshot.activityLogs?.length) {
         await this.db.insert(activityLogs).values(snapshot.activityLogs);
       }
+      if (snapshot.costEvents?.length) {
+        await this.db.insert(costEvents).values(snapshot.costEvents);
+      }
 
       await this.pool.query("COMMIT");
     } catch (error) {
       await this.pool.query("ROLLBACK");
       throw error;
     }
+  }
+
+  override async getCostEvents(filter?: CostEventFilter): Promise<CostEvent[]> {
+    await this.ready;
+    const rows = await this.db.select().from(costEvents).orderBy(costEvents.createdAt);
+    let filtered = rows.reverse(); // newest first
+    if (filter?.runId) {
+      filtered = filtered.filter((r) => r.runId === filter.runId);
+    }
+    if (filter?.limit !== undefined && filter.limit > 0) {
+      filtered = filtered.slice(0, filter.limit);
+    }
+    return filtered;
+  }
+
+  override async getCostEvent(id: string): Promise<CostEvent | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(costEvents).where(eq(costEvents.id, id));
+    return record;
+  }
+
+  override async createCostEvent(event: InsertCostEvent): Promise<CostEvent> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(costEvents)
+      .values({
+        ...event,
+        id: randomUUID(),
+        runId: event.runId ?? null,
+        promptTokens: event.promptTokens ?? null,
+        completionTokens: event.completionTokens ?? null,
+        totalTokens: event.totalTokens ?? null,
+        estimatedCostUsd: event.estimatedCostUsd ?? null,
+        operationLabel: event.operationLabel ?? null,
+      })
+      .returning();
+    return record;
+  }
+
+  override async getCostSummary(runId?: string): Promise<CostSummary> {
+    await this.ready;
+    const rows = await this.db.select().from(costEvents);
+    return buildCostSummary(rows, runId);
   }
 
   override async getActivityLogs(filter?: ActivityLogFilter): Promise<ActivityLog[]> {
@@ -1160,6 +1316,29 @@ class PostgresStorage extends MemStorage {
         actor_note text,
         occurred_at text NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS cost_events (
+        id varchar PRIMARY KEY,
+        run_id varchar,
+        provider text NOT NULL,
+        model text NOT NULL,
+        prompt_tokens integer,
+        completion_tokens integer,
+        total_tokens integer,
+        estimated_cost_usd text,
+        operation_label text,
+        created_at text NOT NULL
+      );
+
+      -- Add approval_note column to runs if it doesn't exist yet (wave 3 migration guard)
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='runs' AND column_name='approval_note'
+        ) THEN
+          ALTER TABLE runs ADD COLUMN approval_note text;
+        END IF;
+      END $$;
     `);
 
     await this.seedIfEmpty();

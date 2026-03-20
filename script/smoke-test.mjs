@@ -717,6 +717,100 @@ async function run() {
       );
     }
 
+    // ── Wave 4: Cost tracking smoke coverage ───────────────────────────────────────────────────────
+
+    // 1. GET /api/cost-events — initially empty
+    const costEventsBefore = await fetchJson("/api/cost-events");
+    assert(costEventsBefore.response.ok, `GET /api/cost-events failed: ${costEventsBefore.text}`);
+    assert(Array.isArray(costEventsBefore.body), "Expected cost events to be an array");
+    const costCountBefore = costEventsBefore.body.length;
+
+    // 2. GET /api/cost-events/summary — should return a summary with zero events
+    const costSummaryBefore = await fetchJson("/api/cost-events/summary");
+    assert(costSummaryBefore.response.ok, `GET /api/cost-events/summary failed: ${costSummaryBefore.text}`);
+    assert(typeof costSummaryBefore.body.totalEvents === "number", "Cost summary missing totalEvents");
+    assert(typeof costSummaryBefore.body.totalTokens === "number", "Cost summary missing totalTokens");
+    assert(typeof costSummaryBefore.body.estimatedTotalCostUsd === "number", "Cost summary missing estimatedTotalCostUsd");
+
+    // 3. POST /api/agent/cost-event — agent-reported cost event
+    const costEventPayload = {
+      provider: "openai",
+      model: "gpt-4o",
+      promptTokens: 1200,
+      completionTokens: 350,
+      totalTokens: 1550,
+      estimatedCostUsd: "0.0155",
+      operationLabel: "smoke-safety-check",
+    };
+    const agentCostResponse = await fetch(`http://127.0.0.1:${port}/api/agent/cost-event`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify(costEventPayload),
+    });
+    const agentCostText = await agentCostResponse.text();
+    assert(agentCostResponse.ok, `Agent cost-event failed: ${agentCostText}`);
+    const agentCostBody = JSON.parse(agentCostText);
+    assert(agentCostBody.provider === "openai", "Cost event provider mismatch");
+    assert(agentCostBody.model === "gpt-4o", "Cost event model mismatch");
+    assert(agentCostBody.totalTokens === 1550, "Cost event totalTokens mismatch");
+    assert(agentCostBody.estimatedCostUsd === "0.0155", "Cost event estimatedCostUsd mismatch");
+    const costEventId = agentCostBody.id;
+    assert(costEventId, "Expected agent cost-event to return an id");
+
+    // 4. GET /api/cost-events — should now have one more event
+    const costEventsAfter = await fetchJson("/api/cost-events");
+    assert(costEventsAfter.response.ok, `GET /api/cost-events after create failed: ${costEventsAfter.text}`);
+    assert(costEventsAfter.body.length === costCountBefore + 1, "Expected cost events count to increment after agent post");
+
+    // 5. GET /api/cost-events/:id — fetch by id
+    const costEventById = await fetchJson(`/api/cost-events/${costEventId}`);
+    assert(costEventById.response.ok, `GET /api/cost-events/:id failed: ${costEventById.text}`);
+    assert(costEventById.body.id === costEventId, "Cost event id mismatch");
+
+    // 6. Non-existent cost event should return 404
+    const missingCostEvent = await fetchJson("/api/cost-events/does-not-exist");
+    assert(missingCostEvent.response.status === 404, `Expected 404 for missing cost event, got ${missingCostEvent.response.status}`);
+
+    // 7. GET /api/cost-events/summary — summary should now show the new event
+    const costSummaryAfter = await fetchJson("/api/cost-events/summary");
+    assert(costSummaryAfter.response.ok, `GET /api/cost-events/summary after create failed: ${costSummaryAfter.text}`);
+    assert(costSummaryAfter.body.totalEvents === costCountBefore + 1, "Cost summary totalEvents did not increment");
+    assert(costSummaryAfter.body.totalTokens >= 1550, "Cost summary totalTokens did not include new event");
+    assert(costSummaryAfter.body.byModel["gpt-4o"] !== undefined, "Cost summary byModel missing gpt-4o");
+    assert(costSummaryAfter.body.byProvider["openai"] !== undefined, "Cost summary byProvider missing openai");
+
+    // 8. Stats endpoint should include costSummary and pendingApprovalCount
+    const statsWithCost = await fetchJson("/api/stats");
+    assert(statsWithCost.response.ok, `GET /api/stats failed: ${statsWithCost.text}`);
+    assert(typeof statsWithCost.body.pendingApprovalCount === "number", "Stats missing pendingApprovalCount");
+    assert(statsWithCost.body.costSummary !== undefined, "Stats missing costSummary");
+    assert(typeof statsWithCost.body.costSummary.totalEvents === "number", "Stats costSummary missing totalEvents");
+
+    // 9. Activity log should record cost_event.created
+    const costActivity = await fetchJson("/api/activity?entityType=cost_event");
+    assert(costActivity.response.ok, `GET /api/activity?entityType=cost_event failed: ${costActivity.text}`);
+    const costActivityEntry = costActivity.body.find((e) => e.action === "cost_event.created");
+    assert(Boolean(costActivityEntry), "Expected cost_event.created activity log entry");
+
+    // 10. Agent cost-event with linked runId should validate run existence
+    const badCostEvent = await fetch(`http://127.0.0.1:${port}/api/agent/cost-event`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${agentIngestToken}`,
+      },
+      body: JSON.stringify({
+        runId: "does-not-exist",
+        provider: "anthropic",
+        model: "claude-3-5-sonnet",
+        totalTokens: 500,
+      }),
+    });
+    assert(badCostEvent.status === 400, `Expected 400 for cost event with invalid runId, got ${badCostEvent.status} body=${await badCostEvent.text()}`);
+
     console.log(`${logPrefix} Smoke test passed`);
   } finally {
     await stopServer(server);

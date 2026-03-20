@@ -119,3 +119,30 @@ export const activityLogs = pgTable("activity_logs", {
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+
+// ── Cost Events ──
+// Lightweight cost tracking inspired by Paperclip's cost event concept.
+// Each event captures token usage and an estimated cost for one agent
+// operation, tied optionally to a run. Kept simple: no quotas or budgets.
+export const costEvents = pgTable("cost_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Optional link to the run that incurred this cost
+  runId: varchar("run_id"),
+  // Provider string, e.g. "openai", "anthropic", "google"
+  provider: text("provider").notNull(),
+  // Model identifier, e.g. "gpt-4o", "claude-3-5-sonnet"
+  model: text("model").notNull(),
+  // Token counts — nullable so partial reports are accepted
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  totalTokens: integer("total_tokens"),
+  // Estimated cost in USD, stored as a text to avoid float precision issues
+  estimatedCostUsd: text("estimated_cost_usd"),
+  // Optional label describing the operation (e.g. "safety-check", "review")
+  operationLabel: text("operation_label"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertCostEventSchema = createInsertSchema(costEvents).omit({ id: true });
+export type InsertCostEvent = z.infer<typeof insertCostEventSchema>;
+export type CostEvent = typeof costEvents.$inferSelect;

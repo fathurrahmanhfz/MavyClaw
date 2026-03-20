@@ -25,6 +25,8 @@ It gives you:
 - run tracking with evidence and operator notes
 - a lightweight safety gate before risky actions
 - **approval workflow for risky runs**: runs that receive a `hold-for-approval` safety decision automatically enter `pending-approval` state, and operators can approve or reject them via the dashboard or API
+- **approval queue view**: the Runs page shows a pending-approval count badge and filter chips so operators can quickly isolate runs waiting for a decision; the Dashboard shows a highlighted banner with a direct link when there are pending items
+- **lightweight cost tracking**: agent activity can report token usage and estimated cost per operation via `POST /api/agent/cost-event`; the cost history is readable at `/api/cost-events` and summarized at `/api/cost-events/summary`; when events exist, the Dashboard shows a cost summary card with total tokens, estimated USD, and breakdown by model
 - lessons learned and post-task reviews
 - token-based agent ingest for machine-to-machine lifecycle updates
 - a dashboard that reflects backend data and refreshes live after authenticated workspace changes, including a **recent activity feed** powered by the activity log API
@@ -345,6 +347,10 @@ Current API routes include:
 - `/api/agent/safety-check`
 - `/api/agent/lesson`
 - `/api/agent/review`
+- `/api/agent/cost-event` — report token usage and cost for an agent operation
+- `/api/cost-events` — list recent cost events; supports `?runId=<id>&limit=N`
+- `/api/cost-events/summary` — aggregate totals by model and provider; supports `?runId=<id>`
+- `/api/cost-events/:id`
 
 ### Approval workflow
 
@@ -376,11 +382,13 @@ Both endpoints require the `editor` role. Attempting to approve or reject a run 
 - session auth with role-based write protection
 - live dashboard refresh through `/api/live`; the activity feed also refreshes live when authenticated
 - lightweight approval workflow: `pending-approval` run state, approve/reject endpoints, automatic transition on `hold-for-approval` safety checks
+- approval queue improvements: filter chips and pending-approval count badge on the Runs page, highlighted banner with a direct link on the Dashboard
+- lightweight cost tracking: `cost_events` table; agent and manual ingest via `POST /api/agent/cost-event` or `POST /api/cost-events`; read via `GET /api/cost-events` and `GET /api/cost-events/summary`; cost summary exposed in `/api/stats` and rendered as a Dashboard card when events exist
 - dashboard recent activity feed reading from `/api/activity` with live refresh on `activity-log-created` SSE events
 - PostgreSQL runtime auto-activation when `DATABASE_URL` is present unless overridden
 - file-backed persistence fallback for production-style setups without PostgreSQL
 - workspace export and import for portability
-- repeatable smoke tests for development, file runtime, and PostgreSQL runtime (includes approval workflow coverage)
+- repeatable smoke tests for development, file runtime, and PostgreSQL runtime (includes approval workflow and cost tracking coverage)
 - CI for typecheck, build, and smoke validation
 
 ## Project structure

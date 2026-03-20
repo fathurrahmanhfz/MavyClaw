@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import StatusBadge from "@/components/StatusBadge";
-import { Play, AlertTriangle, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, AlertTriangle, Plus, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import type { Run, Scenario } from "@shared/schema";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ export default function Runs() {
   const [showCreate, setShowCreate] = useState(false);
   const [newScenarioId, setNewScenarioId] = useState("");
   const [newNote, setNewNote] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const { data: runs, isLoading, error } = useQuery<Run[]>({
     queryKey: ["/api/runs"],
@@ -98,6 +99,10 @@ export default function Runs() {
   });
 
   const scenarioMap = new Map((scenarios || []).map((s) => [s.id, s]));
+  const pendingApprovalCount = (runs || []).filter((r) => r.status === "pending-approval").length;
+  const filteredRuns = statusFilter
+    ? (runs || []).filter((r) => r.status === statusFilter)
+    : (runs || []);
 
   if (error) {
     return (
@@ -130,6 +135,46 @@ export default function Runs() {
           <Plus className="w-4 h-4 mr-1" />
           Create Run
         </Button>
+      </div>
+
+      {/* Filter chips for approval queue */}
+      <div className="flex flex-wrap gap-2 items-center" data-testid="runs-filter-chips">
+        <Button
+          size="sm"
+          variant={statusFilter === null ? "default" : "outline"}
+          className="h-7 text-xs"
+          onClick={() => setStatusFilter(null)}
+          data-testid="filter-all"
+        >
+          All
+        </Button>
+        <Button
+          size="sm"
+          variant={statusFilter === "pending-approval" ? "default" : "outline"}
+          className="h-7 text-xs flex items-center gap-1"
+          onClick={() => setStatusFilter(statusFilter === "pending-approval" ? null : "pending-approval")}
+          data-testid="filter-pending-approval"
+        >
+          <Clock className="w-3 h-3" />
+          Pending Approval
+          {pendingApprovalCount > 0 && (
+            <span className="ml-1 rounded-full bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5" data-testid="badge-pending-count">
+              {pendingApprovalCount}
+            </span>
+          )}
+        </Button>
+        {["running", "blocked", "planned", "passed", "failed"].map((s) => (
+          <Button
+            key={s}
+            size="sm"
+            variant={statusFilter === s ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => setStatusFilter(statusFilter === s ? null : s)}
+            data-testid={`filter-${s}`}
+          >
+            {s}
+          </Button>
+        ))}
       </div>
 
       {!canWrite ? (
@@ -186,9 +231,9 @@ export default function Runs() {
             <Skeleton key={i} className="h-20 w-full rounded-lg" />
           ))}
         </div>
-      ) : runs?.length ? (
+      ) : filteredRuns.length > 0 ? (
         <div className="space-y-3">
-          {runs.map((run) => {
+          {filteredRuns.map((run) => {
             const sc = scenarioMap.get(run.scenarioId);
             const isExpanded = expandedRun === run.id;
             return (
@@ -303,7 +348,9 @@ export default function Runs() {
       ) : (
         <div className="text-center py-12" data-testid="empty-runs">
           <Play className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No benchmark runs yet</p>
+          <p className="text-sm text-muted-foreground">
+            {statusFilter ? `No runs with status '${statusFilter}'` : "No benchmark runs yet"}
+          </p>
         </div>
       )}
     </div>

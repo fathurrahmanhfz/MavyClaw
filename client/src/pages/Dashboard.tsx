@@ -14,9 +14,19 @@ import {
   TrendingUp,
   AlertTriangle,
   Activity,
+  Clock,
+  DollarSign,
 } from "lucide-react";
 import type { Run, ActivityLog } from "@shared/schema";
 import { useLiveUpdates } from "@/lib/live";
+
+interface CostSummary {
+  totalEvents: number;
+  totalTokens: number;
+  estimatedTotalCostUsd: number;
+  byModel: Record<string, { events: number; tokens: number; estimatedCostUsd: number }>;
+  byProvider: Record<string, { events: number; tokens: number; estimatedCostUsd: number }>;
+}
 
 interface Stats {
   runtime: string;
@@ -35,10 +45,12 @@ interface Stats {
   totalLessons: number;
   totalReviews: number;
   totalSafetyChecks: number;
+  pendingApprovalCount: number;
   runsByStatus: Record<string, number>;
   lessonsByStatus: Record<string, number>;
   errorCategories: Record<string, number>;
   recentRuns: Run[];
+  costSummary: CostSummary;
 }
 
 export default function Dashboard() {
@@ -83,6 +95,21 @@ export default function Dashboard() {
           {liveEnabled ? "Live updates are connected" : "Live updates connect after sign-in"}
         </p>
       </div>
+
+      {/* Pending approval banner — shown when there are runs waiting for operator decision */}
+      {stats && stats.pendingApprovalCount > 0 && (
+        <div className="rounded-md border border-violet-500/40 bg-violet-500/10 p-3 flex items-center justify-between gap-3" data-testid="pending-approval-banner">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="text-sm text-violet-300 font-medium">
+              {stats.pendingApprovalCount} run{stats.pendingApprovalCount !== 1 ? "s" : ""} pending approval
+            </span>
+          </div>
+          <a href="/runs" className="text-xs font-medium text-violet-300 hover:text-violet-100 underline underline-offset-2" data-testid="pending-approval-link">
+            Review in Runs
+          </a>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {isLoading ? (
@@ -245,6 +272,38 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cost Summary card — only rendered when there is at least one cost event */}
+      {stats && stats.costSummary.totalEvents > 0 && (
+        <Card className="bg-card border-card-border" data-testid="cost-summary-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" />
+              Cost Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm" data-testid="cost-summary-grid">
+              <div className="rounded-lg border border-card-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Total events</p>
+                <p className="font-mono font-semibold" data-testid="cost-total-events">{stats.costSummary.totalEvents}</p>
+              </div>
+              <div className="rounded-lg border border-card-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Total tokens</p>
+                <p className="font-mono font-semibold" data-testid="cost-total-tokens">{stats.costSummary.totalTokens.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg border border-card-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Est. cost (USD)</p>
+                <p className="font-mono font-semibold" data-testid="cost-total-usd">${stats.costSummary.estimatedTotalCostUsd.toFixed(4)}</p>
+              </div>
+              <div className="rounded-lg border border-card-border p-3">
+                <p className="text-xs text-muted-foreground mb-1">Models used</p>
+                <p className="font-mono font-semibold">{Object.keys(stats.costSummary.byModel).join(", ") || "—"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {stats ? (
         <WorkspacePortabilityCard runtime={stats.runtime} persistence={stats.persistence} />

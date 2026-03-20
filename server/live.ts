@@ -9,7 +9,8 @@ type WorkspaceEventType =
   | "safety-check-created"
   | "lesson-created"
   | "review-created"
-  | "activity-log-created";
+  | "activity-log-created"
+  | "cost-event-created";
 
 export interface WorkspaceEvent {
   id: string;

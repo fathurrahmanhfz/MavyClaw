@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getSessionState, loginHandler, logoutHandler, requireRole } from "./auth";
 import { publishWorkspaceEvent, registerWorkspaceEventsStream } from "./live";
 import {
+  insertCostEventSchema,
   insertLessonSchema,
   insertReviewSchema,
   insertRunSchema,
@@ -11,6 +12,7 @@ import {
   insertScenarioSchema,
 } from "@shared/schema";
 import {
+  agentCostEventSchema,
   agentLessonSchema,
   agentReviewSchema,
   agentRunFinishSchema,
@@ -19,6 +21,7 @@ import {
   agentSafetyCheckSchema,
   buildAgentScenario,
   requireAgentIngest,
+  toInsertCostEventFromAgent,
   toInsertLessonFromAgent,
   toInsertReviewFromAgent,
   toInsertRunFromAgentStart,
@@ -65,6 +68,7 @@ const snapshotSchema = z.object({
   safetyChecks: z.array(insertSafetyCheckSchema.extend({ id: z.string() })),
   lessons: z.array(insertLessonSchema.extend({ id: z.string() })),
   reviews: z.array(insertReviewSchema.extend({ id: z.string() })),
+  costEvents: z.array(insertCostEventSchema.extend({ id: z.string() })).optional(),
 });
 
 function normalizeSnapshot(snapshot: z.infer<typeof snapshotSchema>): StorageSnapshot {
@@ -91,6 +95,15 @@ function normalizeSnapshot(snapshot: z.infer<typeof snapshotSchema>): StorageSna
     })),
     // Activity logs are not imported via workspace snapshot (they are operational data)
     activityLogs: [],
+    costEvents: (snapshot.costEvents ?? []).map((e) => ({
+      ...e,
+      runId: e.runId ?? null,
+      promptTokens: e.promptTokens ?? null,
+      completionTokens: e.completionTokens ?? null,
+      totalTokens: e.totalTokens ?? null,
+      estimatedCostUsd: e.estimatedCostUsd ?? null,
+      operationLabel: e.operationLabel ?? null,
+    })),
   };
 }
 
@@ -576,13 +589,14 @@ export async function registerRoutes(
   });
 
   app.get("/api/stats", async (_req, res) => {
-    const [runtimeInfo, scenarios, runs, lessons, reviews, safetyChecks] = await Promise.all([
+    const [runtimeInfo, scenarios, runs, lessons, reviews, safetyChecks, costSummary] = await Promise.all([
       storage.getRuntimeInfo(),
       storage.getScenarios(),
       storage.getRuns(),
       storage.getLessons(),
       storage.getReviews(),
       storage.getSafetyChecks(),
+      storage.getCostSummary(),
     ]);
 
     const runsByStatus = runs.reduce((acc, r) => {
@@ -600,6 +614,8 @@ export async function registerRoutes(
       return acc;
     }, {} as Record<string, number>);
 
+    const pendingApprovalCount = runs.filter((r) => r.status === "pending-approval").length;
+
     res.json({
       runtime: runtimeInfo.runtime,
       persistence: runtimeInfo.persistence,
@@ -610,11 +626,83 @@ export async function registerRoutes(
       totalLessons: lessons.length,
       totalReviews: reviews.length,
       totalSafetyChecks: safetyChecks.length,
+      pendingApprovalCount,
       runsByStatus,
       lessonsByStatus,
       errorCategories,
       recentRuns: runs.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
+      costSummary,
     });
+  });
+
+  // ── Cost Events ──────────────────────────────────────────────────────────────────────────────────
+  // GET /api/cost-events — returns recent cost events, newest first.
+  // Optional query params: ?runId=<id>&limit=50
+  app.get("/api/cost-events", requireRole("viewer"), async (req, res) => {
+    const runId = typeof req.query.runId === "string" ? req.query.runId : undefined;
+    const rawLimit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined;
+    const limit = rawLimit !== undefined && !isNaN(rawLimit) && rawLimit > 0 ? rawLimit : 100;
+    const entries = await storage.getCostEvents({ runId, limit });
+    res.json(entries);
+  });
+
+  app.get("/api/cost-events/summary", requireRole("viewer"), async (req, res) => {
+    const runId = typeof req.query.runId === "string" ? req.query.runId : undefined;
+    const summary = await storage.getCostSummary(runId);
+    res.json(summary);
+  });
+
+  app.get("/api/cost-events/:id", requireRole("viewer"), async (req, res) => {
+    const eventId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const entry = await storage.getCostEvent(eventId);
+    if (!entry) return res.status(404).json({ error: "Cost event not found" });
+    res.json(entry);
+  });
+
+  // POST /api/cost-events — manual / UI cost event creation (editor+)
+  app.post("/api/cost-events", requireRole("editor"), async (req, res) => {
+    const parsed = validateBody(insertCostEventSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    if (parsed.data.runId) {
+      const run = await storage.getRun(parsed.data.runId);
+      if (!run) {
+        return res.status(400).json({ error: `Run with ID ${parsed.data.runId} was not found` });
+      }
+    }
+
+    const event = await storage.createCostEvent(parsed.data);
+    publishWorkspaceEvent("cost-event-created");
+    logActivity(
+      "cost_event.created",
+      "cost_event",
+      event.id,
+      `Cost event: ${event.provider}/${event.model} tokens=${event.totalTokens ?? "?"} cost=$${event.estimatedCostUsd ?? "?"}`,
+    );
+    res.status(201).json(event);
+  });
+
+  // POST /api/agent/cost-event — agent-reported token usage and cost
+  app.post("/api/agent/cost-event", requireAgentIngest(), async (req, res) => {
+    const parsed = validateBody(agentCostEventSchema, req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    if (parsed.data.runId) {
+      const run = await storage.getRun(parsed.data.runId);
+      if (!run) {
+        return res.status(400).json({ error: `Run with ID ${parsed.data.runId} was not found` });
+      }
+    }
+
+    const event = await storage.createCostEvent(toInsertCostEventFromAgent(parsed.data));
+    publishWorkspaceEvent("cost-event-created");
+    logActivity(
+      "cost_event.created",
+      "cost_event",
+      event.id,
+      `Agent cost event: ${event.provider}/${event.model} tokens=${event.totalTokens ?? "?"} cost=$${event.estimatedCostUsd ?? "?"}`,
+    );
+    res.status(201).json(event);
   });
 
   return httpServer;
