@@ -40,6 +40,25 @@ This repository is valuable if you want to:
 - use a real working baseline instead of inventing the entire model from scratch
 - extend a lightweight prototype into a more tailored internal system
 
+## Agent deployment contract
+
+If an AI agent is given this repository URL for installation or VPS setup, it should treat this repo as both the application and the deployment contract.
+
+The short rule is:
+
+- run MavyClaw on an internal host and port
+- publish it through Nginx, Caddy, or a secure tunnel
+- verify `/api/health` and `/api/stats` before claiming success
+- prefer file or PostgreSQL persistence for production-style setups
+- do not expose the raw app port publicly unless that risk is explicitly accepted
+
+Reference files for agents:
+
+- [Deployment contract](docs/deployment-contract.md)
+- [Nginx example](deploy/nginx/mavyclaw.conf.example)
+- [Caddy example](deploy/caddy/Caddyfile.example)
+- [systemd service example](deploy/systemd/mavyclaw.service.example)
+
 ---
 
 ## Quick value snapshot
@@ -303,6 +322,7 @@ npm run start
 
 Supported environment variables:
 
+- `HOST`
 - `PORT`
 - `NODE_ENV`
 - `STORAGE_BACKEND`
@@ -315,6 +335,7 @@ Example:
 
 ```env
 NODE_ENV=development
+HOST=127.0.0.1
 PORT=5000
 STORAGE_BACKEND=memory
 DATA_FILE=.runtime/mavyclaw-data.json
@@ -324,6 +345,8 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 Important note:
 
 Development defaults to seeded in-memory storage for fast iteration. When `DATABASE_URL` is present, the app now switches to PostgreSQL runtime automatically and reports `runtime: postgres` with `persistence: database` in `/api/health` and `/api/stats`. If PostgreSQL is not configured in production, the app falls back to file-backed persistence, which keeps created records across restarts.
+
+For VPS and reverse-proxy deployments, prefer `HOST=127.0.0.1` so the app stays internal and is published through Nginx, Caddy, or a secure tunnel instead of exposing the raw application port.
 
 ---
 
@@ -347,6 +370,7 @@ The API currently includes basic payload validation for create and update flows,
 
 Additional public repo documents:
 
+- [Deployment contract](docs/deployment-contract.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Roadmap](ROADMAP.md)
 

@@ -1,0 +1,22 @@
+[Unit]
+Description=MavyClaw benchmark operations workspace
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mavyclaw
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=5000
+Environment=STORAGE_BACKEND=file
+Environment=DATA_FILE=/opt/mavyclaw/.runtime/mavyclaw-data.json
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+User=mavyclaw
+Group=mavyclaw
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
