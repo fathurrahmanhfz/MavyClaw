@@ -190,6 +190,33 @@ async function run() {
     const statsAfterCreate = await fetchJson("/api/stats");
     assert(statsAfterCreate.body.totalRuns === runsBefore + 1, "Run count did not increment after create");
 
+    const exported = await fetchJson("/api/workspace/export");
+    assert(exported.response.ok, `Workspace export failed: ${exported.text}`);
+    assert(exported.body.snapshot.runs.length === runsBefore + 1, "Exported snapshot did not include the created run");
+
+    const filteredSnapshot = {
+      ...exported.body.snapshot,
+      runs: exported.body.snapshot.runs.filter((item) => item.id === createRun.body.id),
+      safetyChecks: [],
+      lessons: exported.body.snapshot.lessons.slice(0, 1),
+      reviews: [],
+    };
+
+    const imported = await fetchJson("/api/workspace/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snapshot: filteredSnapshot }),
+    });
+    assert(imported.response.ok, `Workspace import failed: ${imported.text}`);
+
+    const statsAfterImport = await fetchJson("/api/stats");
+    assert(statsAfterImport.body.totalRuns === 1, "Workspace import did not replace runs with the imported snapshot");
+    assert(statsAfterImport.body.totalLessons === 1, "Workspace import did not replace lessons with the imported snapshot");
+
+    const importedRuns = await fetchJson("/api/runs");
+    assert(importedRuns.body.length === 1, "Expected exactly one imported run after workspace restore");
+    assert(importedRuns.body[0].id === createRun.body.id, "Imported run does not match exported workspace snapshot");
+
     const invalidRun = await fetchJson("/api/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -203,7 +230,8 @@ async function run() {
       await waitForServer();
 
       const statsAfterRestart = await fetchJson("/api/stats");
-      assert(statsAfterRestart.body.totalRuns === runsBefore + 1, `${mode} persistence did not survive restart`);
+      assert(statsAfterRestart.body.totalRuns === 1, `${mode} import state did not survive restart`);
+      assert(statsAfterRestart.body.totalLessons === 1, `${mode} imported lesson state did not survive restart`);
 
       const runs = await fetchJson("/api/runs");
       const created = runs.body.find((item) => item.operatorNote === payload.operatorNote);

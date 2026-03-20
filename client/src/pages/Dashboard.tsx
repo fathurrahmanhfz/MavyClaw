@@ -3,6 +3,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "@/components/StatusBadge";
+import WorkspacePortabilityCard from "@/components/WorkspacePortabilityCard";
 import { Link } from "wouter";
 import {
   FlaskConical,
@@ -183,6 +184,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {stats ? (
+        <WorkspacePortabilityCard runtime={stats.runtime} persistence={stats.persistence} />
+      ) : null}
 
       <Card className="bg-card border-card-border">
         <CardHeader className="pb-3">

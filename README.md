@@ -234,6 +234,7 @@ MavyClaw is already a usable benchmark ops workspace, not just a mock interface.
 - runtime visibility through `/api/health` and `/api/stats`
 - PostgreSQL-backed persistence when `DATABASE_URL` is available
 - file-backed persistence as a safe fallback when Postgres is not configured
+- full workspace export/import for backup and portability
 - repeatable smoke tests for development, file runtime, and PostgreSQL runtime checks
 - CI that runs typecheck, build, and smoke validation
 
@@ -331,6 +332,8 @@ Development defaults to seeded in-memory storage for fast iteration. When `DATAB
 Current API surface includes routes for:
 
 - `/api/health`
+- `/api/workspace/export`
+- `/api/workspace/import`
 - `/api/scenarios`
 - `/api/runs`
 - `/api/safety-checks`
@@ -338,7 +341,7 @@ Current API surface includes routes for:
 - `/api/reviews`
 - `/api/stats`
 
-The API currently includes basic payload validation for create and update flows, plus runtime health and persistence reporting through `/api/health` and `/api/stats`. Those endpoints now distinguish memory, file, and PostgreSQL runtime modes.
+The API currently includes basic payload validation for create and update flows, runtime health and persistence reporting through `/api/health` and `/api/stats`, and full workspace export/import for easier backup and portability.
 
 ## Public docs
 
@@ -359,27 +362,16 @@ MavyClaw is built around a few practical ideas:
 
 ---
 
-## Current limitations
+## Next maturity moves
 
-Before adopting the repo more broadly, keep these limits in mind:
-
-- development still defaults to in-memory runtime for speed
-- authentication and role-based access are not in place yet
-- some production concerns remain intentionally out of scope for the current public stage
-- the current PostgreSQL bootstrap uses runtime table creation instead of a formal migration chain
-
-## Suggested next extensions
-
-Teams adopting MavyClaw will likely want to add:
+MavyClaw is already usable today, and the next high-value upgrades are straightforward:
 
 - auth and role-based access
-- benchmark import and export flows
-- richer run analytics
-- approval workflows
-- attachments or richer evidence handling
-- richer scenario-specific automated test coverage
-- production deployment and environment management
-- formal database migrations and stronger relational constraints
+- richer run analytics and approval workflows
+- stronger production packaging and environment management
+- formal database migrations and stricter relational constraints
+
+That is a much shorter list than before because PostgreSQL runtime, file persistence fallback, and workspace portability are already built into the current public version.
 
 ## Safety note
 

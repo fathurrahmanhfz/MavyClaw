@@ -31,7 +31,7 @@ export interface StorageRuntimeInfo {
   dataFile: string | null;
 }
 
-interface StorageSnapshot {
+export interface StorageSnapshot {
   scenarios: Scenario[];
   runs: Run[];
   safetyChecks: SafetyCheck[];
@@ -67,6 +67,8 @@ function requestedStorageRuntime(): StorageRuntime {
 
 export interface IStorage {
   getRuntimeInfo(): Promise<StorageRuntimeInfo>;
+  exportSnapshot(): Promise<StorageSnapshot>;
+  importSnapshot(snapshot: StorageSnapshot): Promise<void>;
 
   // Scenarios
   getScenarios(): Promise<Scenario[]>;
@@ -196,6 +198,15 @@ export class MemStorage implements IStorage {
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       dataFile: null,
     };
+  }
+
+  async exportSnapshot(): Promise<StorageSnapshot> {
+    return clone(this.snapshot());
+  }
+
+  async importSnapshot(snapshot: StorageSnapshot): Promise<void> {
+    this.restore(clone(snapshot));
+    this.persistSnapshot();
   }
 
   protected persistSnapshot() {
@@ -715,6 +726,55 @@ class PostgresStorage extends MemStorage {
       databaseConfigured: true,
       dataFile: null,
     };
+  }
+
+  override async exportSnapshot(): Promise<StorageSnapshot> {
+    await this.ready;
+    const [scenarioRows, runRows, safetyRows, lessonRows, reviewRows] = await Promise.all([
+      this.db.select().from(scenarios).orderBy(scenarios.id),
+      this.db.select().from(runs).orderBy(runs.createdAt),
+      this.db.select().from(safetyChecks).orderBy(safetyChecks.createdAt),
+      this.db.select().from(lessons).orderBy(lessons.createdAt),
+      this.db.select().from(reviews).orderBy(reviews.createdAt),
+    ]);
+
+    return {
+      scenarios: scenarioRows,
+      runs: runRows,
+      safetyChecks: safetyRows,
+      lessons: lessonRows,
+      reviews: reviewRows,
+    };
+  }
+
+  override async importSnapshot(snapshot: StorageSnapshot): Promise<void> {
+    await this.ready;
+    await this.pool.query("BEGIN");
+
+    try {
+      await this.pool.query("TRUNCATE TABLE reviews, lessons, safety_checks, runs, scenarios");
+
+      if (snapshot.scenarios.length) {
+        await this.db.insert(scenarios).values(snapshot.scenarios);
+      }
+      if (snapshot.runs.length) {
+        await this.db.insert(runs).values(snapshot.runs);
+      }
+      if (snapshot.safetyChecks.length) {
+        await this.db.insert(safetyChecks).values(snapshot.safetyChecks);
+      }
+      if (snapshot.lessons.length) {
+        await this.db.insert(lessons).values(snapshot.lessons);
+      }
+      if (snapshot.reviews.length) {
+        await this.db.insert(reviews).values(snapshot.reviews);
+      }
+
+      await this.pool.query("COMMIT");
+    } catch (error) {
+      await this.pool.query("ROLLBACK");
+      throw error;
+    }
   }
 
   override async getScenarios(): Promise<Scenario[]> {

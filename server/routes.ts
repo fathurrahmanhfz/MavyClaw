@@ -8,13 +8,45 @@ import {
   insertSafetyCheckSchema,
   insertScenarioSchema,
 } from "@shared/schema";
-import { storage } from "./storage";
+import { storage, type StorageSnapshot } from "./storage";
 
 const runUpdateSchema = insertRunSchema
   .partial()
   .refine((payload) => Object.keys(payload).length > 0, {
     message: "At least one field must be provided to update a run",
   });
+
+const snapshotSchema = z.object({
+  scenarios: z.array(insertScenarioSchema.extend({ id: z.string() })),
+  runs: z.array(insertRunSchema.extend({ id: z.string() })),
+  safetyChecks: z.array(insertSafetyCheckSchema.extend({ id: z.string() })),
+  lessons: z.array(insertLessonSchema.extend({ id: z.string() })),
+  reviews: z.array(insertReviewSchema.extend({ id: z.string() })),
+});
+
+function normalizeSnapshot(snapshot: z.infer<typeof snapshotSchema>): StorageSnapshot {
+  return {
+    scenarios: snapshot.scenarios,
+    runs: snapshot.runs.map((run) => ({
+      ...run,
+      operatorNote: run.operatorNote ?? null,
+      evidence: run.evidence ?? null,
+      safetyDecision: run.safetyDecision ?? null,
+    })),
+    safetyChecks: snapshot.safetyChecks.map((check) => ({
+      ...check,
+      runId: check.runId ?? null,
+    })),
+    lessons: snapshot.lessons.map((lesson) => ({
+      ...lesson,
+      taxonomyL2: lesson.taxonomyL2 ?? null,
+    })),
+    reviews: snapshot.reviews.map((review) => ({
+      ...review,
+      runId: review.runId ?? null,
+    })),
+  };
+}
 
 function validateBody<T>(schema: z.ZodType<T>, payload: unknown) {
   const parsed = schema.safeParse(payload);
@@ -50,6 +82,32 @@ export async function registerRoutes(
       dataFile: runtimeInfo.dataFile,
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
+    });
+  });
+
+  app.get("/api/workspace/export", async (_req, res) => {
+    const runtimeInfo = await storage.getRuntimeInfo();
+    const snapshot = await storage.exportSnapshot();
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="mavyclaw-workspace-${runtimeInfo.runtime}.json"`);
+    res.json({
+      exportedAt: new Date().toISOString(),
+      runtime: runtimeInfo.runtime,
+      snapshot,
+    });
+  });
+
+  app.post("/api/workspace/import", async (req, res) => {
+    const parsed = validateBody(z.object({ snapshot: snapshotSchema }), req.body);
+    if (!parsed.ok) return res.status(400).json(parsed.error);
+
+    await storage.importSnapshot(normalizeSnapshot(parsed.data.snapshot));
+    const runtimeInfo = await storage.getRuntimeInfo();
+    res.json({
+      status: "ok",
+      runtime: runtimeInfo.runtime,
+      importedAt: new Date().toISOString(),
     });
   });
 
