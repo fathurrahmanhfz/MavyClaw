@@ -1,47 +1,18 @@
 # Deployment Contract for AI Agents
 
-This repository should be treated as an internal service first and a public application second.
+Treat this repository as an internal service first and a public application second.
 
-AI agents that receive this repository URL are expected to follow this contract when installing, running, or publishing MavyClaw on a VPS, cloud VM, container host, or similar environment.
+If an AI agent receives this repository URL, it should follow this contract when installing, verifying, and publishing MavyClaw.
 
 ## Primary rule
 
-Run MavyClaw on an internal port and publish it through a reverse proxy or secure tunnel.
+Run MavyClaw on an internal bind such as `127.0.0.1:5000` and publish it through a reverse proxy or secure tunnel.
 
-Do not expose the application port directly to the public internet unless the operator explicitly accepts that risk.
+Do not expose the raw application port directly to the internet unless the operator explicitly accepts that risk.
 
-## Runtime contract
+## Default production posture
 
-The application supports three runtime storage modes:
-
-- `memory` for fast local iteration
-- `file` for persistent disk-backed storage without PostgreSQL
-- `postgres` for database-backed persistence
-
-Runtime behavior must be verified through these endpoints after startup:
-
-- `GET /api/health`
-- `GET /api/stats`
-- authenticated browser access through the intended published route when the service is meant to be used remotely
-
-Agents must not claim a successful deployment until `/api/health` reports the expected runtime and persistence mode.
-
-## Required environment decisions
-
-Agents must set or evaluate these environment variables:
-
-- `NODE_ENV`
-- `PORT`
-- `HOST`
-- `STORAGE_BACKEND`
-- `DATA_FILE`
-- `DATABASE_URL`
-- `AUTH_MODE`
-- `SESSION_SECRET`
-- `TRUST_PROXY`
-- `COOKIE_SECURE`
-
-Recommended production defaults:
+Use these defaults unless a stronger requirement is given:
 
 ```env
 NODE_ENV=production
@@ -55,7 +26,7 @@ TRUST_PROXY=1
 COOKIE_SECURE=auto
 ```
 
-If PostgreSQL is available and intended, agents should prefer:
+If PostgreSQL is intentionally available:
 
 ```env
 NODE_ENV=production
@@ -69,47 +40,51 @@ TRUST_PROXY=1
 COOKIE_SECURE=auto
 ```
 
-## Binding and network policy
+## Required decisions
 
-### Safe default
+Before claiming success, the agent must decide and record:
 
-Use `HOST=127.0.0.1` so the application is reachable only from the local machine or reverse proxy.
+1. Which runtime profile is intended: `memory`, `file`, or `postgres`.
+2. Whether the host is local-only, internal VPS, or public-facing.
+3. Which publish path is used: Nginx, Caddy, Cloudflare Tunnel, or direct public binding.
+4. Which process supervisor keeps the app running.
+5. Which verification commands were run.
 
-### Public publishing
+## Runtime rules
 
-For public access, publish MavyClaw through one of these:
+Supported runtime storage modes:
 
-- Nginx reverse proxy
-- Caddy reverse proxy
-- secure tunnel such as Cloudflare Tunnel
-- direct public binding only when the operator explicitly accepts the reduced safety posture
+- `memory` for fast local development only
+- `file` for persistent disk-backed storage without PostgreSQL
+- `postgres` for database-backed persistence
 
-### Firewall expectation
+Agents must not call a deployment successful until `/api/health` reports the expected runtime and persistence mode.
 
-Agents should prefer this network posture:
+Expected runtime outcomes:
 
-- open only 80 and 443 publicly when using a reverse proxy
-- do not open the application port publicly
-- keep database ports private unless there is an explicit managed-network requirement
+- file mode: `runtime: file` and `persistence: disk`
+- postgres mode: `runtime: postgres` and `persistence: database`
+- memory mode is acceptable only for local development, not production-style deployment
 
-## Startup sequence for agents
+## Minimum install sequence
 
-An agent installing this repository should follow this order:
+An agent should follow this order:
 
 1. Clone the repository.
 2. Install dependencies with `npm install`.
-3. Copy `.env.example` to `.env` and set production-safe values.
-4. Build with `npm run build`.
-5. Start the application with `npm run start` or a process manager.
-6. Verify `GET /api/health` locally.
-7. Verify `GET /api/stats` locally.
-8. Attach the app to a reverse proxy or secure tunnel.
-9. Validate the public route.
-10. Record the final runtime mode, persistence mode, public hostname, and process supervisor.
+3. Copy `.env.example` or the matching env template into `.env`.
+4. Set real credentials and a strong `SESSION_SECRET`.
+5. Run `npm run check`.
+6. Run `npm run build`.
+7. Run the relevant smoke test.
+8. Start the app with `npm run start` or a process supervisor.
+9. Verify `/api/health` and `/api/stats` locally.
+10. Attach a reverse proxy or secure tunnel if remote access is intended.
+11. Validate the published route honestly.
 
 ## Minimum verification checklist
 
-Agents should complete all of the following before declaring success:
+Agents should complete all applicable checks:
 
 - `npm run check`
 - `npm run build`
@@ -117,102 +92,99 @@ Agents should complete all of the following before declaring success:
 - `npm run smoke:postgres` when PostgreSQL is intentionally configured
 - local `GET /api/health` returns `200`
 - local `GET /api/stats` returns `200`
-- the public hostname resolves correctly
-- the reverse proxy returns the application successfully over HTTPS when configured
+- public route resolves and loads when remote publishing is intended
+- HTTPS works when configured
 
-## Reverse proxy expectations
+For local runtime verification, agents may also run:
 
-### Subdomain-first policy
+```bash
+BASE_URL=http://127.0.0.1:5000 EXPECTED_RUNTIME=file EXPECTED_PERSISTENCE=disk bash deploy/verify-deployment.sh
+```
+
+## Network policy
+
+Preferred posture:
+
+- bind the application to `127.0.0.1`
+- open only 80 and 443 publicly when using a reverse proxy
+- do not open the application port publicly by default
+- keep database ports private unless an explicit managed-network requirement exists
+
+## Publish policy
+
+### Preferred order
+
+Use these options in this order unless the operator requests otherwise:
+
+1. Nginx reverse proxy
+2. Caddy reverse proxy
+3. Cloudflare Tunnel
+4. Direct public binding only with explicit risk acceptance
+
+### Reverse proxy guidance
 
 Prefer a dedicated subdomain such as:
 
 - `mavyclaw.example.com`
 - `benchops.example.com`
 
-This is preferred over path-based routing because it avoids frontend asset, cookie, and header confusion for generic AI agent deployments.
-
-### Internal upstream target
-
-Agents should target the local service, for example:
+Target the local upstream, for example:
 
 - `http://127.0.0.1:5000`
 
-## Persistence rules
+This repository already includes proxy-safe handling for `/api/live`, so the live dashboard keeps refreshing behind supported proxies.
 
-### PostgreSQL path
+## Process supervision
 
-Use PostgreSQL when durable relational persistence is available and intended.
+For VPS deployments, agents should prefer:
 
-Agents must confirm that `/api/health` reports:
+- systemd
+- Docker with restart policies
+- another managed process runner with restart and logs
 
-- `runtime: postgres`
-- `persistence: database`
+The process should restart automatically after reboot or crash.
 
-### File fallback path
+## Workspace portability
 
-When PostgreSQL is not available, file-backed persistence is the preferred production fallback.
-
-Agents must confirm that `/api/health` reports:
-
-- `runtime: file`
-- `persistence: disk`
-
-The data file path should be preserved across restarts and included in backup policy.
-
-### Workspace portability
-
-For backup, migration, or environment transfer, agents may use:
+For backup, restore, or environment transfer, agents may use:
 
 - `GET /api/workspace/export`
 - `POST /api/workspace/import`
 
-Agents should treat workspace export/import as a supported portability mechanism, not as an emergency-only fallback.
+Treat workspace export and import as a supported portability feature, not an emergency-only fallback.
 
-## Process supervision
-
-For VPS deployments, agents should prefer a supervisor such as:
-
-- systemd
-- Docker with restart policies
-- another managed process runner with auto-restart and logs
-
-The process should restart automatically after reboot or crash.
-
-## Logging expectations
-
-Agents should preserve:
-
-- application stdout and stderr logs
-- reverse proxy access logs when available
-- reverse proxy error logs when available
-
-## Unsafe behavior to avoid
+## Unsafe behavior
 
 Agents should avoid the following unless explicitly requested:
 
 - exposing the raw application port directly to the internet
 - claiming PostgreSQL is active without checking `/api/health`
 - using in-memory storage for a production-style deployment
-- pointing experimental writes at production databases without explicit approval
-- declaring deployment success before verifying the public URL
+- declaring deployment success before verifying the public route
+- skipping smoke tests when a production-style setup is being claimed
+- overwriting deployment-specific values blindly on an existing host
 
-## Human-readable deployment outcome
+## Required deployment summary
 
-A successful agent deployment report should include:
+A successful deployment report should include:
 
+- repository URL used
+- commit or branch deployed
 - runtime mode
 - persistence mode
 - internal bind host and port
-- public hostname
-- reverse proxy or tunnel type
+- public hostname, if any
+- proxy or tunnel method used
 - process supervisor used
 - verification commands run
 - remaining risks or follow-up items
 
-## Repository reference files
+## Reference files
 
-Agents should also consult:
+Agents should consult these repository files:
 
+- `README.md`
+- `docs/agent-setup-playbook.md`
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
@@ -225,11 +197,9 @@ Agents should also consult:
 - `deploy/caddy/Caddyfile.example`
 - `deploy/cloudflare/cloudflared-config.example.yml`
 - `deploy/systemd/mavyclaw.service.example`
-- `docs/agent-setup-playbook.md`
-- `README.md`
 
-These helpers are conservative on purpose:
+These helpers are intentionally conservative:
 
-- `deploy/install-vps.sh` assumes a Debian or Ubuntu style host with `apt-get` and `systemd`
-- `deploy/register-nginx.sh` and `deploy/register-caddy.sh` expect a local upstream and include validation plus rollback behavior
-- existing deployment-specific values such as `.env` should be preserved unless the operator intentionally overwrites them
+- `deploy/install-vps.sh` assumes Debian or Ubuntu style hosts with `apt-get` and `systemd`
+- proxy helpers expect a local upstream and include validation plus rollback behavior
+- existing deployment values such as `.env` should be preserved unless the operator intentionally overwrites them

@@ -1,9 +1,10 @@
 # Agent Setup Playbook
 
-This playbook explains how an AI agent should install, verify, and publish MavyClaw on a VPS or similar host.
+Use this playbook when an AI agent needs to install, verify, and publish MavyClaw on a VPS or similar host.
 
-Use this document together with:
+Read this together with:
 
+- `README.md`
 - `docs/deployment-contract.md`
 - `deploy/install-vps.sh`
 - `deploy/register-nginx.sh`
@@ -22,52 +23,77 @@ Use this document together with:
 
 Given only the repository URL, an agent should be able to:
 
-- install the application safely
-- choose a persistence mode intentionally
-- publish it in a secure way
+- choose the right runtime profile
+- install the app safely
+- publish it with a sane security posture
 - verify the runtime honestly
-- leave the system in a maintainable state
+- leave behind a maintainable setup
 
 ## Decision order
 
 The agent should decide in this order:
 
-1. What host is this running on?
-2. Is the target local development, internal VPS, or production-style public deployment?
-3. Is PostgreSQL available and intended?
-4. Should publishing use Nginx, Caddy, or Cloudflare Tunnel?
-5. What process supervisor will keep the app running?
-6. What verification can be run before declaring success?
+1. Is this local development, internal VPS use, or public remote access?
+2. Is PostgreSQL actually intended and available?
+3. Should publishing use Nginx, Caddy, Cloudflare Tunnel, or direct public binding?
+4. Which process supervisor will keep the app running?
+5. Which verification will prove the claim honestly?
 
-## Recommended default choices
+## Recommended default path
 
-If no stronger requirement is provided, the safest defaults are:
+If no stronger requirement exists, use this path:
 
-- `NODE_ENV=production`
 - `HOST=127.0.0.1`
 - `PORT=5000`
 - `STORAGE_BACKEND=file`
-- `DATA_FILE=.runtime/mavyclaw-data.json`
-- `AUTH_MODE=demo` with a real secret and strong password
+- `AUTH_MODE=demo` with a strong password
+- `SESSION_SECRET` set to a strong random value
 - `TRUST_PROXY=1`
 - `COOKIE_SECURE=auto`
 - publish through Nginx, Caddy, or Cloudflare Tunnel
 - supervise with systemd on a VPS
 
-## Setup procedure
+## Fastest safe setup paths
 
-### 1. Clone and install
-
-Manual path:
+### Local development
 
 ```bash
 git clone https://github.com/fathurrahmanhfz/MavyClaw.git
 cd MavyClaw
 npm install
-cp .env.example .env
+cp deploy/env.local.example .env
+npm run dev
 ```
 
-Automated VPS path:
+### VPS with file persistence
+
+```bash
+git clone https://github.com/fathurrahmanhfz/MavyClaw.git
+cd MavyClaw
+npm install
+cp deploy/env.vps-file.example .env
+npm run check
+npm run build
+npm run smoke:prod
+npm run start
+```
+
+### VPS with PostgreSQL
+
+```bash
+git clone https://github.com/fathurrahmanhfz/MavyClaw.git
+cd MavyClaw
+npm install
+cp deploy/env.vps-postgres.example .env
+npm run check
+npm run build
+npm run smoke:postgres
+npm run start
+```
+
+## Automated VPS helper
+
+For Debian or Ubuntu style hosts with `apt-get` and `systemd`, the install helper can bootstrap a baseline setup:
 
 ```bash
 sudo APP_DIR=/opt/mavyclaw \
@@ -79,16 +105,29 @@ sudo APP_DIR=/opt/mavyclaw \
   bash deploy/install-vps.sh
 ```
 
-Behavior notes for the helper:
+Helper behavior:
 
-- it currently targets Debian or Ubuntu style hosts with `apt-get` and `systemd`
-- it preserves an existing `.env` unless `FORCE_OVERWRITE_ENV=1` is set
-- it prefers `npm ci` when `package-lock.json` is present
-- it creates the runtime data directory before starting the service
+- preserves an existing `.env` unless `FORCE_OVERWRITE_ENV=1` is set
+- prefers `npm ci` when `package-lock.json` exists
+- prepares the runtime data directory before start
+- assumes a Debian or Ubuntu style host and systemd
 
-### 2. Set environment values
+## Required environment checks
 
-For a production-style VPS with file persistence:
+Before start, confirm these values intentionally:
+
+- `NODE_ENV`
+- `HOST`
+- `PORT`
+- `STORAGE_BACKEND`
+- `DATA_FILE`
+- `DATABASE_URL`
+- `AUTH_MODE`
+- `SESSION_SECRET`
+- `TRUST_PROXY`
+- `COOKIE_SECURE`
+
+### File-backed production example
 
 ```env
 NODE_ENV=production
@@ -103,7 +142,7 @@ COOKIE_SECURE=auto
 DEMO_AUTH_PASSWORD=replace-with-a-strong-password
 ```
 
-For a PostgreSQL-backed deployment:
+### PostgreSQL-backed production example
 
 ```env
 NODE_ENV=production
@@ -118,7 +157,9 @@ COOKIE_SECURE=auto
 DEMO_AUTH_PASSWORD=replace-with-a-strong-password
 ```
 
-### 3. Build and verify locally
+## Verification sequence
+
+Run verification in this order:
 
 ```bash
 npm run check
@@ -132,19 +173,7 @@ If PostgreSQL is intended:
 npm run smoke:postgres
 ```
 
-### 4. Start the service
-
-For a manual check:
-
-```bash
-npm run start
-```
-
-For a persistent VPS deployment, prefer a service manager such as systemd.
-
-### 5. Verify runtime honesty
-
-The agent must verify:
+After the app is running, verify locally:
 
 ```bash
 curl http://127.0.0.1:5000/api/health
@@ -152,131 +181,123 @@ curl http://127.0.0.1:5000/api/stats
 BASE_URL=http://127.0.0.1:5000 EXPECTED_RUNTIME=file EXPECTED_PERSISTENCE=disk bash deploy/verify-deployment.sh
 ```
 
-Expected behavior:
+Expected outcome:
 
-- file deployment reports `runtime: file` and `persistence: disk`
-- PostgreSQL deployment reports `runtime: postgres` and `persistence: database`
-- memory mode is acceptable for local development only, not for production-style deployment
+- file deployments report `runtime: file` and `persistence: disk`
+- PostgreSQL deployments report `runtime: postgres` and `persistence: database`
+- memory mode is acceptable only for local development
 
-### 6. Publish the service
+## Publish the service
 
-#### Option A: Nginx
+### Option A: Nginx
 
 Use `deploy/nginx/mavyclaw.conf.example` and point the upstream to `127.0.0.1:5000`.
 
-For a scripted registration on a VPS:
+For scripted registration:
 
 ```bash
 sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-nginx.sh
 ```
 
-Behavior notes for the helper:
+Use Nginx when:
 
-- it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
-- it writes a backup of the prior config when one exists
-- it validates Nginx and rolls back if reload fails
-- it keeps `/api/live` unbuffered so the dashboard can continue to refresh automatically
+- the host already uses Nginx
+- explicit proxy control is preferred
+- multiple apps share one VPS gateway
 
-#### Option B: Caddy
+### Option B: Caddy
 
-Use `deploy/caddy/Caddyfile.example` for automatic HTTPS when DNS points to the server.
+Use `deploy/caddy/Caddyfile.example` when automatic HTTPS and simpler setup are preferred.
 
-For a scripted registration on a VPS:
+For scripted registration:
 
 ```bash
 sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-caddy.sh
 ```
 
-Behavior notes for the helper:
+Use Caddy when:
 
-- it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
-- it writes a backup of the current Caddyfile before replacing it
-- it validates Caddy and rolls back if reload fails
-- it keeps `/api/live` streaming so the dashboard can continue to refresh automatically
+- the environment is simple and domain-based
+- automatic HTTPS is preferred
+- the operator wants fewer moving parts
 
-#### Option C: Cloudflare Tunnel
+### Option C: Cloudflare Tunnel
 
-Use `deploy/cloudflare/cloudflared-config.example.yml`.
+Use `deploy/cloudflare/cloudflared-config.example.yml` when the origin should stay private.
 
-This is especially useful when the operator wants the origin to remain private and avoid exposing the raw VPS service publicly.
+Use Cloudflare Tunnel when:
 
-### 7. Verify public access
+- inbound exposure should be minimized
+- the operator wants a safer origin posture
+- the app should be reachable without directly exposing the VPS app port
 
-After the proxy or tunnel is attached, the agent should verify:
+### Option D: direct public binding
+
+This is the least preferred option.
+
+Use it only when the operator explicitly accepts the trade-off, and then:
+
+- keep a strong `SESSION_SECRET`
+- use a strong password
+- limit firewall exposure to the intended app port
+- prefer a short-lived evaluation environment
+
+## Public verification
+
+After a proxy or tunnel is attached, verify:
 
 - the hostname resolves
 - HTTPS works when configured
 - the homepage loads
 - `/api/health` is reachable through the published route when intended
+- login works through the intended public route
 
-## Publishing strategy guidance
-
-### Choose Nginx when
-
-- the host already uses Nginx
-- the operator wants explicit proxy control
-- multiple apps will share one VPS gateway
-
-### Choose Caddy when
-
-- the operator wants simpler setup
-- automatic HTTPS is preferred
-- the environment is straightforward and domain-based
-
-### Choose Cloudflare Tunnel when
-
-- the operator wants a safer origin posture
-- inbound exposure should be minimized
-- the service should be reachable without directly exposing the app port
-
-Quick tunnels are not a production answer. Use a real tunnel for durable deployment.
-
-### Option D: direct public binding
-
-This is the least preferred option and should be used only when the operator explicitly accepts the trade-off.
-
-If direct binding is chosen:
-
-- use a strong `SESSION_SECRET`
-- use a strong password
-- keep the firewall limited to the app port you intentionally expose
-- prefer a temporary evaluation environment rather than a long-lived production deployment
-
-## Process supervision guidance
+## Process supervision
 
 On a VPS, prefer systemd.
 
-The agent should ensure:
+The final setup should have:
 
 - automatic restart on crash
 - automatic start on reboot
-- logs are accessible
-- the working directory is stable
+- accessible logs
+- a stable working directory
 
 ## Persistence guidance
 
-### Use file mode when
+Use file mode when:
 
 - PostgreSQL is unavailable
-- a lightweight single-host deployment is acceptable
-- backup will include the runtime data file
+- a lightweight single-host setup is enough
+- the runtime data file will be included in backup policy
 
-### Use PostgreSQL when
+Use PostgreSQL when:
 
-- durable database persistence is available
-- the operator expects a stronger production posture
-- the agent can verify real connectivity before claiming success
+- stronger durable persistence is intended
+- database connectivity is actually available
+- the agent can verify the runtime honestly before claiming success
 
-### Use workspace export/import when
+Use workspace export and import when:
 
 - moving between environments
 - creating backups
 - restoring test data
 - seeding a new environment safely
 
-## Final success report format
+## Minimum safe behavior
 
-A capable agent should leave behind a final deployment summary containing:
+The agent should never:
+
+- claim success before checking `/api/health`
+- expose the raw app port without intent
+- call a memory deployment production-ready
+- claim PostgreSQL is active without verification
+- skip local verification and rely only on a public page load
+- run helper scripts blindly without checking host compatibility
+
+## Final success report
+
+A capable agent should leave behind a final summary with:
 
 - repository URL used
 - commit or branch deployed
@@ -288,14 +309,3 @@ A capable agent should leave behind a final deployment summary containing:
 - process supervisor used
 - verification commands run
 - unresolved risks, if any
-
-## Minimum safe behavior
-
-The agent should never:
-
-- claim success before checking `/api/health`
-- expose the raw app port without intent
-- call a memory deployment production-ready
-- say PostgreSQL is active without verifying it
-- skip local verification and rely only on a public page load
-- run the helper scripts blindly without checking whether the host actually uses Debian or Ubuntu style packaging, Nginx, Caddy, or systemd
