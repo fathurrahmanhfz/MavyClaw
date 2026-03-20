@@ -71,6 +71,13 @@ sudo APP_DIR=/opt/mavyclaw \
   bash deploy/install-vps.sh
 ```
 
+Behavior notes for the helper:
+
+- it currently targets Debian or Ubuntu style hosts with `apt-get` and `systemd`
+- it preserves an existing `.env` unless `FORCE_OVERWRITE_ENV=1` is set
+- it prefers `npm ci` when `package-lock.json` is present
+- it creates the runtime data directory before starting the service
+
 ### 2. Set environment values
 
 For a production-style VPS with file persistence:
@@ -144,6 +151,12 @@ For a scripted registration on a VPS:
 sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-nginx.sh
 ```
 
+Behavior notes for the helper:
+
+- it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
+- it writes a backup of the prior config when one exists
+- it validates Nginx and rolls back if reload fails
+
 #### Option B: Caddy
 
 Use `deploy/caddy/Caddyfile.example` for automatic HTTPS when DNS points to the server.
@@ -153,6 +166,12 @@ For a scripted registration on a VPS:
 ```bash
 sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-caddy.sh
 ```
+
+Behavior notes for the helper:
+
+- it expects a local upstream such as `127.0.0.1`, `::1`, or `localhost`
+- it writes a backup of the current Caddyfile before replacing it
+- it validates Caddy and rolls back if reload fails
 
 #### Option C: Cloudflare Tunnel
 
@@ -247,4 +266,4 @@ The agent should never:
 - call a memory deployment production-ready
 - say PostgreSQL is active without verifying it
 - skip local verification and rely only on a public page load
-- run the helper scripts blindly without checking whether the host actually uses Nginx, Caddy, or systemd
+- run the helper scripts blindly without checking whether the host actually uses Debian or Ubuntu style packaging, Nginx, Caddy, or systemd

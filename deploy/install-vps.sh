@@ -13,10 +13,30 @@ STORAGE_BACKEND_VALUE="${STORAGE_BACKEND_VALUE:-file}"
 DATA_FILE_VALUE="${DATA_FILE_VALUE:-.runtime/mavyclaw-data.json}"
 NODE_ENV_VALUE="${NODE_ENV_VALUE:-production}"
 DATABASE_URL_VALUE="${DATABASE_URL_VALUE:-}"
+FORCE_OVERWRITE_ENV="${FORCE_OVERWRITE_ENV:-0}"
 
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "This script must run as root." >&2
+    exit 1
+  fi
+}
+
+require_supported_host() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "This helper currently supports Debian or Ubuntu style hosts with apt-get." >&2
+    exit 1
+  fi
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "systemd is required for this helper. Use the manual path or adapt the service setup for this host." >&2
+    exit 1
+  fi
+}
+
+validate_port() {
+  if ! [[ "${PORT_VALUE}" =~ ^[0-9]+$ ]] || (( PORT_VALUE < 1 || PORT_VALUE > 65535 )); then
+    echo "PORT_VALUE must be a valid TCP port." >&2
     exit 1
   fi
 }
@@ -54,14 +74,44 @@ install_app() {
   fi
 
   cd "${APP_DIR}"
-  npm install
+
+  if [[ -f package-lock.json ]]; then
+    npm ci
+  else
+    npm install
+  fi
+
   npm run check
   npm run build
   mkdir -p .runtime
 }
 
+ensure_data_path() {
+  local data_dir
+
+  if [[ "${DATA_FILE_VALUE}" = /* ]]; then
+    data_dir="$(dirname "${DATA_FILE_VALUE}")"
+  else
+    data_dir="${APP_DIR}/$(dirname "${DATA_FILE_VALUE}")"
+  fi
+
+  mkdir -p "${data_dir}"
+}
+
 write_env() {
-  cat > "${APP_DIR}/.env" <<EOF
+  local env_path="${APP_DIR}/.env"
+  local backup_path="${APP_DIR}/.env.bak"
+
+  if [[ -f "${env_path}" && "${FORCE_OVERWRITE_ENV}" != "1" ]]; then
+    echo "Preserving existing ${env_path}. Set FORCE_OVERWRITE_ENV=1 to replace it." >&2
+    return 0
+  fi
+
+  if [[ -f "${env_path}" ]]; then
+    cp "${env_path}" "${backup_path}"
+  fi
+
+  cat > "${env_path}" <<EOF
 NODE_ENV=${NODE_ENV_VALUE}
 HOST=${HOST_VALUE}
 PORT=${PORT_VALUE}
@@ -72,10 +122,18 @@ EOF
 }
 
 install_service() {
-  cat > /etc/systemd/system/${APP_NAME}.service <<EOF
+  local service_path="/etc/systemd/system/${APP_NAME}.service"
+  local backup_path="/etc/systemd/system/${APP_NAME}.service.bak"
+
+  if [[ -f "${service_path}" ]]; then
+    cp "${service_path}" "${backup_path}"
+  fi
+
+  cat > "${service_path}" <<EOF
 [Unit]
 Description=MavyClaw benchmark operations workspace
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -100,11 +158,15 @@ EOF
 
 verify_local_health() {
   local health_url="http://${HOST_VALUE}:${PORT_VALUE}/api/health"
+  local health_file="/tmp/${APP_NAME}-health.json"
   echo "Waiting for ${health_url}"
 
+  rm -f "${health_file}"
+
   for _ in $(seq 1 40); do
-    if curl -fsS "${health_url}" >/tmp/${APP_NAME}-health.json 2>/dev/null; then
-      cat /tmp/${APP_NAME}-health.json
+    if curl -fsS "${health_url}" >"${health_file}" 2>/dev/null; then
+      cat "${health_file}"
+      rm -f "${health_file}"
       return 0
     fi
     sleep 1
@@ -112,6 +174,7 @@ verify_local_health() {
 
   echo "Local health check did not become ready in time." >&2
   systemctl status ${APP_NAME}.service --no-pager || true
+  rm -f "${health_file}"
   exit 1
 }
 
@@ -125,6 +188,10 @@ Systemd service: ${APP_NAME}.service
 Bind address: ${HOST_VALUE}:${PORT_VALUE}
 Storage backend: ${STORAGE_BACKEND_VALUE}
 
+Notes:
+- Existing .env is preserved unless FORCE_OVERWRITE_ENV=1 is set.
+- This helper expects a Debian or Ubuntu style host with systemd.
+
 Next steps:
 - Register Nginx: deploy/register-nginx.sh
 - Register Caddy: deploy/register-caddy.sh
@@ -134,9 +201,12 @@ EOF
 
 main() {
   require_root
+  require_supported_host
+  validate_port
   ensure_user
   install_base_packages
   install_app
+  ensure_data_path
   write_env
   install_service
   verify_local_health

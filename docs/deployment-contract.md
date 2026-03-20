@@ -208,3 +208,9 @@ Agents should also consult:
 - `deploy/systemd/mavyclaw.service.example`
 - `docs/agent-setup-playbook.md`
 - `README.md`
+
+These helpers are conservative on purpose:
+
+- `deploy/install-vps.sh` assumes a Debian or Ubuntu style host with `apt-get` and `systemd`
+- `deploy/register-nginx.sh` and `deploy/register-caddy.sh` expect a local upstream and include validation plus rollback behavior
+- existing deployment-specific values such as `.env` should be preserved unless the operator intentionally overwrites them

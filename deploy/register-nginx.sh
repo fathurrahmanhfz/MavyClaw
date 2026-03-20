@@ -8,25 +8,54 @@ CONF_NAME="${CONF_NAME:-mavyclaw}"
 NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
 NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
 CONF_PATH="${NGINX_SITES_AVAILABLE}/${CONF_NAME}.conf"
+BACKUP_PATH="${CONF_PATH}.bak"
+TMP_PATH="$(mktemp)"
 
-if [[ -z "${DOMAIN}" ]]; then
-  echo "Set DOMAIN, for example: DOMAIN=mavyclaw.example.com" >&2
-  exit 1
-fi
+cleanup() {
+  rm -f "${TMP_PATH}"
+}
+trap cleanup EXIT
 
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "This script must run as root." >&2
-  exit 1
-fi
+require_root() {
+  if [[ "${EUID}" -ne 0 ]]; then
+    echo "This script must run as root." >&2
+    exit 1
+  fi
+}
 
-if ! command -v nginx >/dev/null 2>&1; then
-  echo "Nginx is not installed." >&2
-  exit 1
-fi
+validate_inputs() {
+  if [[ -z "${DOMAIN}" ]]; then
+    echo "Set DOMAIN, for example: DOMAIN=mavyclaw.example.com" >&2
+    exit 1
+  fi
 
-mkdir -p "${NGINX_SITES_AVAILABLE}" "${NGINX_SITES_ENABLED}"
+  if ! [[ "${UPSTREAM_PORT}" =~ ^[0-9]+$ ]] || (( UPSTREAM_PORT < 1 || UPSTREAM_PORT > 65535 )); then
+    echo "UPSTREAM_PORT must be a valid TCP port." >&2
+    exit 1
+  fi
 
-cat > "${CONF_PATH}" <<EOF
+  if [[ "${UPSTREAM_HOST}" != "127.0.0.1" && "${UPSTREAM_HOST}" != "::1" && "${UPSTREAM_HOST}" != "localhost" ]]; then
+    echo "UPSTREAM_HOST should stay local unless the operator explicitly adapts this helper." >&2
+    exit 1
+  fi
+}
+
+require_nginx() {
+  if ! command -v nginx >/dev/null 2>&1; then
+    echo "Nginx is not installed." >&2
+    exit 1
+  fi
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "systemd is required for this helper." >&2
+    exit 1
+  fi
+}
+
+write_config() {
+  mkdir -p "${NGINX_SITES_AVAILABLE}" "${NGINX_SITES_ENABLED}"
+
+  cat > "${TMP_PATH}" <<EOF
 server {
     listen 80;
     listen [::]:80;
@@ -45,9 +74,41 @@ server {
 }
 EOF
 
-ln -sfn "${CONF_PATH}" "${NGINX_SITES_ENABLED}/${CONF_NAME}.conf"
-nginx -t
-systemctl reload nginx
+  if [[ -f "${CONF_PATH}" ]]; then
+    cp "${CONF_PATH}" "${BACKUP_PATH}"
+  fi
 
-echo "Nginx config registered for ${DOMAIN} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}"
-echo "Add TLS separately or switch to Caddy if you want automatic HTTPS."
+  cp "${TMP_PATH}" "${CONF_PATH}"
+  ln -sfn "${CONF_PATH}" "${NGINX_SITES_ENABLED}/${CONF_NAME}.conf"
+}
+
+reload_with_rollback() {
+  if nginx -t && systemctl reload nginx; then
+    return 0
+  fi
+
+  echo "Nginx validation or reload failed. Rolling back the config." >&2
+
+  if [[ -f "${BACKUP_PATH}" ]]; then
+    cp "${BACKUP_PATH}" "${CONF_PATH}"
+  else
+    rm -f "${CONF_PATH}" "${NGINX_SITES_ENABLED}/${CONF_NAME}.conf"
+  fi
+
+  nginx -t
+  systemctl reload nginx || true
+  exit 1
+}
+
+main() {
+  require_root
+  validate_inputs
+  require_nginx
+  write_config
+  reload_with_rollback
+
+  echo "Nginx config registered for ${DOMAIN} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}"
+  echo "Add TLS separately or switch to Caddy if you want automatic HTTPS."
+}
+
+main "$@"

@@ -386,6 +386,13 @@ Helper scripts for VPS-oriented agents:
 - `deploy/register-nginx.sh`
 - `deploy/register-caddy.sh`
 
+The helpers are intentionally conservative:
+
+- the install helper targets Debian or Ubuntu style hosts with `apt-get` and `systemd`
+- the proxy helpers expect a local upstream such as `127.0.0.1:5000`
+- the proxy helpers validate config and roll back if reload fails
+- the install helper preserves an existing `.env` unless overwrite is explicitly requested
+
 ## Design principles
 
 MavyClaw is built around a few practical ideas:
