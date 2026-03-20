@@ -231,14 +231,16 @@ This public repository is currently best described as a polished public prototyp
 - seeded sample data for immediate exploration
 - structured operational workflows across scenarios, runs, safety, lessons, and reviews
 - API payload validation for create and update flows
-- health endpoint for runtime checks
-- public CI for typecheck and production build
+- health and stats endpoints that expose the active runtime mode
+- file-backed runtime persistence for production-style runs
+- reusable smoke tests for development and production runtime checks
+- public CI for typecheck, build, and smoke validation
 
 ### Not finished yet
 
-- database-backed persistence as the default runtime
+- PostgreSQL-backed persistence is not wired in yet, even if `DATABASE_URL` is set
 - authentication and multi-user support
-- broader automated test coverage beyond the current quality gate
+- deeper scenario-specific tests beyond the current runtime smoke coverage
 - full production hardening
 
 That means the repo is already useful for internal evaluation, demos, product exploration, and extension work, but it should not be presented as a finished production platform.
@@ -275,7 +277,7 @@ script/        Build scripts
 
 - Node.js 20+
 - npm 10+
-- PostgreSQL-compatible database if you want to continue the database path
+- PostgreSQL-compatible database only if you want to continue the future Drizzle/Postgres path
 
 ### Local setup
 
@@ -300,6 +302,8 @@ Supported environment variables:
 
 - `PORT`
 - `NODE_ENV`
+- `STORAGE_BACKEND`
+- `DATA_FILE`
 - `DATABASE_URL`
 
 Example:
@@ -307,12 +311,14 @@ Example:
 ```env
 NODE_ENV=development
 PORT=5000
+STORAGE_BACKEND=memory
+DATA_FILE=.runtime/mavyclaw-data.json
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 ```
 
 Important note:
 
-The current public snapshot still runs without an active database because the default runtime uses seeded in-memory storage. `DATABASE_URL` is included as part of the path toward PostgreSQL-backed persistence.
+Development defaults to seeded in-memory storage for fast iteration. Production-style runs now default to file-backed persistence, which keeps created records across restarts. `DATABASE_URL` is still reserved for the future PostgreSQL-backed runtime and does not switch persistence by itself yet.
 
 ---
 
@@ -328,7 +334,7 @@ Current API surface includes routes for:
 - `/api/reviews`
 - `/api/stats`
 
-The API currently includes basic payload validation for create and update flows, plus runtime health reporting.
+The API currently includes basic payload validation for create and update flows, plus runtime health and persistence reporting through `/api/health` and `/api/stats`.
 
 ## Public docs
 
@@ -353,10 +359,10 @@ MavyClaw is built around a few practical ideas:
 
 Before adopting the repo more broadly, keep these limits in mind:
 
-- runtime data is not yet persisted by default
+- the default development runtime is still in-memory on purpose
+- PostgreSQL-backed persistence is not implemented yet
 - there is no authentication layer yet
 - there is no role or permission model yet
-- the current quality gate is useful but still minimal
 - some production concerns remain intentionally out of scope for the public prototype stage
 
 ## Suggested next extensions
@@ -369,7 +375,8 @@ Teams adopting MavyClaw will likely want to add:
 - richer run analytics
 - approval workflows
 - attachments or richer evidence handling
-- stronger automated test coverage
+- richer scenario-specific automated test coverage
+- PostgreSQL-backed persistence
 - production deployment and environment management
 
 ## Safety note

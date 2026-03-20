@@ -16,6 +16,9 @@ import {
 import type { Run } from "@shared/schema";
 
 interface Stats {
+  runtime: string;
+  persistence: string;
+  databaseConfigured: boolean;
   totalScenarios: number;
   totalRuns: number;
   totalLessons: number;
@@ -80,6 +83,35 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="bg-card border-card-border lg:col-span-3">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold">Runtime Readiness</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+              </div>
+            ) : stats ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3" data-testid="runtime-readiness">
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Active runtime</p>
+                  <p className="text-sm font-semibold capitalize" data-testid="runtime-mode">{stats.runtime}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Persistence</p>
+                  <p className="text-sm font-semibold capitalize" data-testid="runtime-persistence">{stats.persistence}</p>
+                </div>
+                <div className="rounded-lg border border-card-border p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Database configured</p>
+                  <p className="text-sm font-semibold" data-testid="runtime-db-configured">{stats.databaseConfigured ? "Yes" : "No"}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No runtime data</p>
+            )}
+          </CardContent>
+        </Card>
         <Card className="bg-card border-card-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">

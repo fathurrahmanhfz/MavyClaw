@@ -27,3 +27,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Smoke test (development runtime)
+        run: npm run smoke:dev
+
+      - name: Smoke test (production file runtime)
+        run: npm run smoke:prod

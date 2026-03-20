@@ -38,11 +38,16 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", async (_req, res) => {
+    const runtimeInfo = await storage.getRuntimeInfo();
+
     res.json({
       status: "ok",
       app: "MavyClaw",
-      runtime: "memory",
+      runtime: runtimeInfo.runtime,
+      persistence: runtimeInfo.persistence,
+      databaseConfigured: runtimeInfo.databaseConfigured,
+      dataFile: runtimeInfo.dataFile,
       timestamp: new Date().toISOString(),
       uptimeSeconds: Math.round(process.uptime()),
     });
@@ -171,7 +176,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/stats", async (_req, res) => {
-    const [scenarios, runs, lessons, reviews, safetyChecks] = await Promise.all([
+    const [runtimeInfo, scenarios, runs, lessons, reviews, safetyChecks] = await Promise.all([
+      storage.getRuntimeInfo(),
       storage.getScenarios(),
       storage.getRuns(),
       storage.getLessons(),
@@ -195,6 +201,9 @@ export async function registerRoutes(
     }, {} as Record<string, number>);
 
     res.json({
+      runtime: runtimeInfo.runtime,
+      persistence: runtimeInfo.persistence,
+      databaseConfigured: runtimeInfo.databaseConfigured,
       totalScenarios: scenarios.length,
       totalRuns: runs.length,
       totalLessons: lessons.length,

@@ -6,8 +6,43 @@ import {
   type Review, type InsertReview,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { dirname, resolve } from "path";
+
+export type StorageRuntime = "memory" | "file";
+
+export interface StorageRuntimeInfo {
+  runtime: StorageRuntime;
+  persistence: "ephemeral" | "disk";
+  databaseConfigured: boolean;
+  dataFile: string | null;
+}
+
+interface StorageSnapshot {
+  scenarios: Scenario[];
+  runs: Run[];
+  safetyChecks: SafetyCheck[];
+  lessons: Lesson[];
+  reviews: Review[];
+}
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function defaultDataFilePath() {
+  return resolve(process.cwd(), process.env.DATA_FILE ?? ".runtime/mavyclaw-data.json");
+}
+
+function requestedStorageRuntime(): StorageRuntime {
+  const requested = (process.env.STORAGE_BACKEND ?? (process.env.NODE_ENV === "production" ? "file" : "memory"))
+    .toLowerCase();
+  return requested === "file" ? "file" : "memory";
+}
 
 export interface IStorage {
+  getRuntimeInfo(): Promise<StorageRuntimeInfo>;
+
   // Scenarios
   getScenarios(): Promise<Scenario[]>;
   getScenario(id: string): Promise<Scenario | undefined>;
@@ -36,14 +71,16 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private scenarios: Map<string, Scenario> = new Map();
-  private runs: Map<string, Run> = new Map();
-  private safetyChecks: Map<string, SafetyCheck> = new Map();
-  private lessons: Map<string, Lesson> = new Map();
-  private reviews: Map<string, Review> = new Map();
+  protected scenarios: Map<string, Scenario> = new Map();
+  protected runs: Map<string, Run> = new Map();
+  protected safetyChecks: Map<string, SafetyCheck> = new Map();
+  protected lessons: Map<string, Lesson> = new Map();
+  protected reviews: Map<string, Review> = new Map();
 
-  constructor() {
-    this.seed();
+  constructor(shouldSeed = true) {
+    if (shouldSeed) {
+      this.seed();
+    }
   }
 
   // ── Scenarios ──
@@ -53,6 +90,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const scenario: Scenario = { ...s, id };
     this.scenarios.set(id, scenario);
+    this.persistSnapshot();
     return scenario;
   }
 
@@ -69,6 +107,7 @@ export class MemStorage implements IStorage {
       safetyDecision: r.safetyDecision ?? null,
     };
     this.runs.set(id, run);
+    this.persistSnapshot();
     return run;
   }
   async updateRun(id: string, data: Partial<InsertRun>): Promise<Run | undefined> {
@@ -76,6 +115,7 @@ export class MemStorage implements IStorage {
     if (!run) return undefined;
     const updated = { ...run, ...data, updatedAt: new Date().toISOString() };
     this.runs.set(id, updated);
+    this.persistSnapshot();
     return updated;
   }
 
@@ -90,6 +130,7 @@ export class MemStorage implements IStorage {
       runId: sc.runId ?? null,
     };
     this.safetyChecks.set(id, check);
+    this.persistSnapshot();
     return check;
   }
 
@@ -104,6 +145,7 @@ export class MemStorage implements IStorage {
       taxonomyL2: l.taxonomyL2 ?? null,
     };
     this.lessons.set(id, lesson);
+    this.persistSnapshot();
     return lesson;
   }
 
@@ -118,11 +160,43 @@ export class MemStorage implements IStorage {
       runId: r.runId ?? null,
     };
     this.reviews.set(id, review);
+    this.persistSnapshot();
     return review;
   }
 
+  async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
+    return {
+      runtime: "memory",
+      persistence: "ephemeral",
+      databaseConfigured: Boolean(process.env.DATABASE_URL),
+      dataFile: null,
+    };
+  }
+
+  protected persistSnapshot() {
+    // Memory storage is intentionally ephemeral.
+  }
+
+  protected snapshot(): StorageSnapshot {
+    return {
+      scenarios: Array.from(this.scenarios.values()),
+      runs: Array.from(this.runs.values()),
+      safetyChecks: Array.from(this.safetyChecks.values()),
+      lessons: Array.from(this.lessons.values()),
+      reviews: Array.from(this.reviews.values()),
+    };
+  }
+
+  protected restore(snapshot: StorageSnapshot) {
+    this.scenarios = new Map(snapshot.scenarios.map((item) => [item.id, item]));
+    this.runs = new Map(snapshot.runs.map((item) => [item.id, item]));
+    this.safetyChecks = new Map(snapshot.safetyChecks.map((item) => [item.id, item]));
+    this.lessons = new Map(snapshot.lessons.map((item) => [item.id, item]));
+    this.reviews = new Map(snapshot.reviews.map((item) => [item.id, item]));
+  }
+
   // ── Seed ──
-  private seed() {
+  protected seed() {
     // --- 8 Scenarios ---
     const scenarioData: (InsertScenario & { id: string })[] = [
       {
@@ -178,7 +252,7 @@ export class MemStorage implements IStorage {
         description: "After deployment, the /api/* path is served as static files by Nginx instead of being proxied to the backend.",
         objective: "Fix the Nginx configuration so API routing works correctly without downtime.",
         acceptanceCriteria: "API endpoints return JSON, the frontend is still served statically, and there is zero downtime.",
-        safeSteps: "1. Backup konfigurasi Nginx saat ini\n2. Review location blocks\n3. Perbaiki proxy_pass directive\n4. nginx -t untuk validasi syntax\n5. Reload (bukan restart) Nginx",
+        safeSteps: "1. Back up the current Nginx configuration\n2. Review location blocks\n3. Fix the proxy_pass directive\n4. Run nginx -t to validate syntax\n5. Reload Nginx instead of restarting it",
         antiPatterns: "Restarting Nginx without testing the config. Editing files in /etc/nginx directly without a backup.",
         verificationChecklist: "nginx -t pass, curl /api/health returns JSON, frontend loads, SSL intact",
         targetEvidence: "nginx -t output, curl response, browser screenshot",
@@ -193,7 +267,7 @@ export class MemStorage implements IStorage {
         description: "The CI build fails because the sharp module cannot install and needs libvips, which is missing from the base image.",
         objective: "Fix the CI pipeline so native dependencies install correctly.",
         acceptanceCriteria: "The CI build is green, image processing works, and build time does not increase significantly.",
-        safeSteps: "1. Identifikasi dependency yang missing\n2. Cek apakah ada alternative pure-JS\n3. Update Dockerfile/CI config\n4. Test build di branch terpisah\n5. Merge setelah green",
+        safeSteps: "1. Identify the missing dependency\n2. Check for a pure-JS alternative\n3. Update the Dockerfile or CI config\n4. Test the build on a separate branch\n5. Merge after it is green",
         antiPatterns: "Installing dependencies globally on the production server. Skipping image optimization. Downgrading a library without evaluation.",
         verificationChecklist: "CI is green, the image resize test passes, build time < 5 minutes",
         targetEvidence: "CI log, test output, build timing",
@@ -208,7 +282,7 @@ export class MemStorage implements IStorage {
         description: "ALTER TABLE ADD COLUMN with a default value on a 5-million-row table can lock the table for minutes.",
         objective: "Run the migration without downtime and without prolonged table locks.",
         acceptanceCriteria: "The new column is available, there is zero downtime, and lock time stays under 1 second.",
-        safeSteps: "1. Analisis migration SQL\n2. Gunakan ADD COLUMN tanpa default dulu\n3. Backfill secara batch\n4. Set default setelah backfill completed\n5. Monitoring lock wait",
+        safeSteps: "1. Analyze the migration SQL\n2. Use ADD COLUMN without a default first\n3. Backfill in batches\n4. Set the default after backfill completes\n5. Monitor lock wait",
         antiPatterns: "Running ALTER TABLE with DEFAULT in a single command. Executing during peak traffic. Having no rollback plan.",
         verificationChecklist: "Lock monitoring is clean, the column exists and is populated, app queries are OK, latency is normal",
         targetEvidence: "pg_stat_activity during migration, row count before/after, latency graph",
@@ -223,7 +297,7 @@ export class MemStorage implements IStorage {
         description: "The ETL pipeline receives data with a changed date format from the source, causing 12% of records to fail parsing.",
         objective: "Fix the pipeline so it tolerates format variation and can recover the data that already arrived.",
         acceptanceCriteria: "The pipeline handles multiple formats, corrupt data is recovered, and alerting is in place.",
-        safeSteps: "1. Sample data corrupt untuk analisis\n2. Identifikasi semua format variasi\n3. Update parser dengan fallback\n4. Re-process batch yang failed\n5. Pasang monitoring dan alert",
+        safeSteps: "1. Sample corrupt data for analysis\n2. Identify every format variation\n3. Update the parser with fallback logic\n4. Re-process failed batches\n5. Add monitoring and alerts",
         antiPatterns: "Forcing parsing with a single format. Dropping failed records without logging. Fixing directly in production.",
         verificationChecklist: "Parse rate reaches 100%, recovered data matches, alert trigger test is OK",
         targetEvidence: "Before/after parse rate, recovered record count, alert log",
@@ -238,7 +312,7 @@ export class MemStorage implements IStorage {
         description: "The deploy succeeds but there is no automated smoke test, so a bug is detected 2 hours later by a user.",
         objective: "Implement automated smoke tests that run immediately after each deploy.",
         acceptanceCriteria: "Smoke tests run in under 30 seconds post-deploy, and failed deploys automatically roll back.",
-        safeSteps: "1. Identifikasi critical paths\n2. Tulis smoke test script\n3. Integrasikan ke deploy pipeline\n4. Tambahkan auto-rollback on failure\n5. Test dengan intentional failure",
+        safeSteps: "1. Identify critical paths\n2. Write the smoke test script\n3. Integrate it into the deploy pipeline\n4. Add auto-rollback on failure\n5. Test with an intentional failure",
         antiPatterns: "Adding too many smoke tests so they become slow. Flaky tests. Skipping smoke tests because the change looks small.",
         verificationChecklist: "Smoke test run < 30s, covers auth + API + DB, rollback works",
         targetEvidence: "Smoke test log, rollback test result, pipeline config",
@@ -267,7 +341,7 @@ export class MemStorage implements IStorage {
         id: "run-002",
         scenarioId: "sc-002",
         status: "passed",
-        operatorNote: "IPv6 issue confirmed. Konfigurasi DNS preference ke IPv4-first berhasil.",
+        operatorNote: "IPv6 issue confirmed. The DNS preference was updated to IPv4-first successfully.",
         evidence: "dig A succeeded, psql connect OK, latency is normal",
         safetyDecision: "allow-read-only",
         createdAt: "2026-03-15T14:00:00Z",
@@ -339,8 +413,8 @@ export class MemStorage implements IStorage {
         targetEnv: "dev",
         actionMode: "read-only",
         affectedAssets: "DNS config, network stack",
-        minVerification: "dig + nc test sebelum perubahan",
-        recoveryPath: "Revert /etc/resolv.conf dari backup",
+        minVerification: "Run dig and nc tests before making any change",
+        recoveryPath: "Restore /etc/resolv.conf from backup",
         decision: "allow-read-only",
         reason: "Diagnosis only, with no writes to system config",
         createdAt: "2026-03-15T13:55:00Z",
@@ -378,7 +452,7 @@ export class MemStorage implements IStorage {
         minVerification: "No writes, audit only",
         recoveryPath: "N/A - read only",
         decision: "allow-read-only",
-        reason: "Audit env tidak mengubah apa pun, aman untuk production",
+        reason: "An env audit changes nothing, so it is safe for production",
         createdAt: "2026-03-18T09:55:00Z",
       },
       {
@@ -390,7 +464,7 @@ export class MemStorage implements IStorage {
         minVerification: "Sample data test, parse rate check",
         recoveryPath: "Re-run the pipeline from the latest checkpoint",
         decision: "allow-guarded-write",
-        reason: "Target sandbox, pipeline bisa di-rerun, data bukan production",
+        reason: "The target is sandbox, the pipeline can be rerun, and the data is non-production",
         createdAt: "2026-03-18T15:00:00Z",
       },
     ];
@@ -483,7 +557,7 @@ export class MemStorage implements IStorage {
         id: "rev-001",
         runId: "run-001",
         taskGoal: "Synchronize the Prisma schema with the sandbox database",
-        finalResult: "Migration berhasil, semua query test passed, zero data loss",
+        finalResult: "The migration succeeded, all query tests passed, and there was zero data loss",
         resultStatus: "completed",
         evidence: "prisma migrate status: clean, 3/3 query assertions passed, row count unchanged",
         whatWorked: "A staged approach worked: review SQL first, run in sandbox, then verify",
@@ -522,7 +596,7 @@ export class MemStorage implements IStorage {
         id: "rev-004",
         runId: null,
         taskGoal: "Set up the observability stack for the sandbox lab",
-        finalResult: "Logging dasar terpasang tapi alerting belum completed",
+        finalResult: "Basic logging is in place, but alerting is not finished yet",
         resultStatus: "partial",
         evidence: "Logs stream to stdout, the Prometheus endpoint is available, and Grafana is not configured yet",
         whatWorked: "Structured logging in JSON format made parsing easier",
@@ -539,4 +613,70 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+class FileStorage extends MemStorage {
+  constructor(private readonly filePath: string) {
+    super(false);
+    this.initialize();
+  }
+
+  override async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
+    return {
+      runtime: "file",
+      persistence: "disk",
+      databaseConfigured: Boolean(process.env.DATABASE_URL),
+      dataFile: this.filePath,
+    };
+  }
+
+  protected override persistSnapshot() {
+    mkdirSync(dirname(this.filePath), { recursive: true });
+    writeFileSync(this.filePath, JSON.stringify(clone(this.snapshot()), null, 2));
+  }
+
+  private initialize() {
+    mkdirSync(dirname(this.filePath), { recursive: true });
+
+    if (!existsSync(this.filePath)) {
+      this.seed();
+      this.persistSnapshot();
+      return;
+    }
+
+    try {
+      const raw = readFileSync(this.filePath, "utf8");
+      const parsed = JSON.parse(raw) as Partial<StorageSnapshot>;
+      const hasArrays =
+        Array.isArray(parsed.scenarios) &&
+        Array.isArray(parsed.runs) &&
+        Array.isArray(parsed.safetyChecks) &&
+        Array.isArray(parsed.lessons) &&
+        Array.isArray(parsed.reviews);
+
+      if (!hasArrays) {
+        throw new Error("Invalid runtime snapshot shape");
+      }
+
+      this.restore({
+        scenarios: parsed.scenarios ?? [],
+        runs: parsed.runs ?? [],
+        safetyChecks: parsed.safetyChecks ?? [],
+        lessons: parsed.lessons ?? [],
+        reviews: parsed.reviews ?? [],
+      });
+    } catch {
+      this.seed();
+      this.persistSnapshot();
+    }
+  }
+}
+
+function createStorage(): IStorage {
+  const runtime = requestedStorageRuntime();
+  if (runtime === "file") {
+    return new FileStorage(defaultDataFilePath());
+  }
+
+  return new MemStorage();
+}
+
+export const storage = createStorage();

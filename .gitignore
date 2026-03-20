@@ -5,6 +5,7 @@ server/public
 vite.config.ts.*
 *.tar.gz
 *.log
+.runtime/
 .env
 .env.local
 npm-debug.log*
