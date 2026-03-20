@@ -56,6 +56,9 @@ Reference files for agents:
 
 - [Deployment contract](docs/deployment-contract.md)
 - [Agent setup playbook](docs/agent-setup-playbook.md)
+- `deploy/install-vps.sh`
+- `deploy/register-nginx.sh`
+- `deploy/register-caddy.sh`
 - [Nginx example](deploy/nginx/mavyclaw.conf.example)
 - [Caddy example](deploy/caddy/Caddyfile.example)
 - [Cloudflare Tunnel example](deploy/cloudflare/cloudflared-config.example.yml)
@@ -376,6 +379,12 @@ Additional public repo documents:
 - [Agent setup playbook](docs/agent-setup-playbook.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Roadmap](ROADMAP.md)
+
+Helper scripts for VPS-oriented agents:
+
+- `deploy/install-vps.sh`
+- `deploy/register-nginx.sh`
+- `deploy/register-caddy.sh`
 
 ## Design principles
 

@@ -5,6 +5,9 @@ This playbook explains how an AI agent should install, verify, and publish MavyC
 Use this document together with:
 
 - `docs/deployment-contract.md`
+- `deploy/install-vps.sh`
+- `deploy/register-nginx.sh`
+- `deploy/register-caddy.sh`
 - `deploy/nginx/mavyclaw.conf.example`
 - `deploy/caddy/Caddyfile.example`
 - `deploy/cloudflare/cloudflared-config.example.yml`
@@ -47,11 +50,25 @@ If no stronger requirement is provided, the safest defaults are:
 
 ### 1. Clone and install
 
+Manual path:
+
 ```bash
 git clone https://github.com/fathurrahmanhfz/MavyClaw.git
 cd MavyClaw
 npm install
 cp .env.example .env
+```
+
+Automated VPS path:
+
+```bash
+sudo APP_DIR=/opt/mavyclaw \
+  APP_USER=mavyclaw \
+  APP_GROUP=mavyclaw \
+  HOST_VALUE=127.0.0.1 \
+  PORT_VALUE=5000 \
+  STORAGE_BACKEND_VALUE=file \
+  bash deploy/install-vps.sh
 ```
 
 ### 2. Set environment values
@@ -121,9 +138,21 @@ Expected behavior:
 
 Use `deploy/nginx/mavyclaw.conf.example` and point the upstream to `127.0.0.1:5000`.
 
+For a scripted registration on a VPS:
+
+```bash
+sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-nginx.sh
+```
+
 #### Option B: Caddy
 
 Use `deploy/caddy/Caddyfile.example` for automatic HTTPS when DNS points to the server.
+
+For a scripted registration on a VPS:
+
+```bash
+sudo DOMAIN=mavyclaw.example.com UPSTREAM_HOST=127.0.0.1 UPSTREAM_PORT=5000 bash deploy/register-caddy.sh
+```
 
 #### Option C: Cloudflare Tunnel
 
@@ -218,3 +247,4 @@ The agent should never:
 - call a memory deployment production-ready
 - say PostgreSQL is active without verifying it
 - skip local verification and rely only on a public page load
+- run the helper scripts blindly without checking whether the host actually uses Nginx, Caddy, or systemd

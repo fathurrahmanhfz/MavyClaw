@@ -199,6 +199,9 @@ A successful agent deployment report should include:
 
 Agents should also consult:
 
+- `deploy/install-vps.sh`
+- `deploy/register-nginx.sh`
+- `deploy/register-caddy.sh`
 - `deploy/nginx/mavyclaw.conf.example`
 - `deploy/caddy/Caddyfile.example`
 - `deploy/cloudflare/cloudflared-config.example.yml`
