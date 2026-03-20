@@ -96,3 +96,25 @@ export const reviews = pgTable("reviews", {
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true });
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
+
+// ── Activity Log ──
+// Lightweight audit trail inspired by Paperclip. Single-tenant; no approval
+// workflows. Records who did what to which entity and when.
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Human-readable action label, e.g. "scenario.updated", "run.cancelled"
+  action: text("action").notNull(),
+  // Entity type: "scenario" | "run" | "safety_check" | "lesson" | "review" | "workspace"
+  entityType: text("entity_type").notNull(),
+  // The affected entity's id, or null for workspace-level events
+  entityId: varchar("entity_id"),
+  // Short description suitable for a feed UI or downstream agent
+  summary: text("summary").notNull(),
+  // Optional operator note captured at event time
+  actorNote: text("actor_note"),
+  occurredAt: text("occurred_at").notNull(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;

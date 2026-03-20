@@ -28,6 +28,31 @@ import {
 import { storage, type StorageSnapshot } from "./storage";
 import { HttpError } from "./errors";
 
+// Helper: fire-and-forget activity log creation.
+// Non-blocking so a log write failure never breaks the primary response.
+function logActivity(
+  action: string,
+  entityType: string,
+  entityId: string | null | undefined,
+  summary: string,
+  actorNote?: string | null,
+): void {
+  storage
+    .createActivityLog({
+      action,
+      entityType,
+      entityId: entityId ?? null,
+      summary,
+      actorNote: actorNote ?? null,
+      occurredAt: new Date().toISOString(),
+    })
+    .then(() => publishWorkspaceEvent("activity-log-created"))
+    .catch((err) => {
+      // Never let a log failure surface to the caller
+      console.error("[activity-log] write failed:", err);
+    });
+}
+
 const runUpdateSchema = insertRunSchema
   .partial()
   .refine((payload) => Object.keys(payload).length > 0, {
@@ -63,6 +88,8 @@ function normalizeSnapshot(snapshot: z.infer<typeof snapshotSchema>): StorageSna
       ...review,
       runId: review.runId ?? null,
     })),
+    // Activity logs are not imported via workspace snapshot (they are operational data)
+    activityLogs: [],
   };
 }
 
@@ -132,12 +159,33 @@ export async function registerRoutes(
 
     await storage.importSnapshot(normalizeSnapshot(parsed.data.snapshot));
     publishWorkspaceEvent("workspace-imported");
+    logActivity("workspace.imported", "workspace", null, "Workspace snapshot imported");
     const runtimeInfo = await storage.getRuntimeInfo();
     res.json({
       status: "ok",
       runtime: runtimeInfo.runtime,
       importedAt: new Date().toISOString(),
     });
+  });
+
+  // ── Activity Log ──────────────────────────────────────────────────────────
+  // GET /api/activity — returns recent activity events, newest first.
+  // Optional query params: ?entityType=run&entityId=<id>&limit=50
+  app.get("/api/activity", requireRole("viewer"), async (req, res) => {
+    const entityType = typeof req.query.entityType === "string" ? req.query.entityType : undefined;
+    const entityId = typeof req.query.entityId === "string" ? req.query.entityId : undefined;
+    const rawLimit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined;
+    const limit = rawLimit !== undefined && !isNaN(rawLimit) && rawLimit > 0 ? rawLimit : 100;
+
+    const entries = await storage.getActivityLogs({ entityType, entityId, limit });
+    res.json(entries);
+  });
+
+  app.get("/api/activity/:id", requireRole("viewer"), async (req, res) => {
+    const entryId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const entry = await storage.getActivityLog(entryId);
+    if (!entry) return res.status(404).json({ error: "Activity log entry not found" });
+    res.json(entry);
   });
 
   app.get("/api/agent/status", async (_req, res) => {
@@ -166,6 +214,7 @@ export async function registerRoutes(
 
     const run = await storage.createRun(toInsertRunFromAgentStart(parsed.data, scenarioId));
     publishWorkspaceEvent("run-created");
+    logActivity("run.created", "run", run.id, `Run created for scenario ${scenarioId}`, parsed.data.operatorNote);
     res.status(201).json(run);
   });
 
@@ -176,6 +225,7 @@ export async function registerRoutes(
     const run = await storage.updateRun(parsed.data.runId, toRunPatchFromAgentProgress(parsed.data));
     if (!run) return res.status(404).json({ error: "Run not found" });
     publishWorkspaceEvent("run-updated");
+    logActivity("run.updated", "run", run.id, `Run status updated to '${parsed.data.status ?? "running"}'`, parsed.data.operatorNote);
     res.json(run);
   });
 
@@ -198,6 +248,7 @@ export async function registerRoutes(
 
     const check = await storage.createSafetyCheck(toInsertSafetyCheckFromAgent(parsed.data));
     publishWorkspaceEvent("safety-check-created");
+    logActivity("safety_check.created", "safety_check", check.id, `Safety check created: decision='${check.decision}' env='${check.targetEnv}'`);
     res.status(201).json(check);
   });
 
@@ -207,6 +258,7 @@ export async function registerRoutes(
 
     const lesson = await storage.createLesson(toInsertLessonFromAgent(parsed.data));
     publishWorkspaceEvent("lesson-created");
+    logActivity("lesson.created", "lesson", lesson.id, `Lesson created: '${lesson.title}'`);
     res.status(201).json(lesson);
   });
 
@@ -223,6 +275,7 @@ export async function registerRoutes(
 
     const review = await storage.createReview(toInsertReviewFromAgent(parsed.data));
     publishWorkspaceEvent("review-created");
+    logActivity("review.created", "review", review.id, `Review created: status='${review.resultStatus}'`);
     res.status(201).json(review);
   });
 
@@ -236,6 +289,7 @@ export async function registerRoutes(
     );
     if (!run) return res.status(404).json({ error: "Run not found" });
     publishWorkspaceEvent("run-updated");
+    logActivity("run.finished", "run", run.id, `Run finished with status '${run.status}'`, parsed.data.operatorNote);
     res.json(run);
   });
 
@@ -256,6 +310,7 @@ export async function registerRoutes(
 
     const scenario = await storage.createScenario(parsed.data);
     publishWorkspaceEvent("scenario-created");
+    logActivity("scenario.created", "scenario", scenario.id, `Scenario created: '${scenario.title}'`);
     res.status(201).json(scenario);
   });
 
@@ -276,6 +331,7 @@ export async function registerRoutes(
     const scenario = await storage.updateScenario(scenarioId, parsed.data);
     if (!scenario) return next(new HttpError(404, "Scenario not found"));
     publishWorkspaceEvent("scenario-created"); // reuses scenario-created to trigger list refresh
+    logActivity("scenario.updated", "scenario", scenario.id, `Scenario updated: '${scenario.title}'`);
     res.json(scenario);
   });
 
@@ -296,6 +352,7 @@ export async function registerRoutes(
 
     const run = await storage.createRun(parsed.data);
     publishWorkspaceEvent("run-created");
+    logActivity("run.created", "run", run.id, `Run created for scenario ${run.scenarioId}`, run.operatorNote);
     res.status(201).json(run);
   });
 
@@ -307,6 +364,7 @@ export async function registerRoutes(
     const run = await storage.updateRun(runId, parsed.data);
     if (!run) return res.status(404).json({ error: "Run not found" });
     publishWorkspaceEvent("run-updated");
+    logActivity("run.updated", "run", run.id, `Run updated: status='${run.status}'`, run.operatorNote);
     res.json(run);
   });
 
@@ -333,6 +391,7 @@ export async function registerRoutes(
       updatedAt: new Date().toISOString(),
     });
     publishWorkspaceEvent("run-updated");
+    logActivity("run.cancelled", "run", runId, `Run cancelled: '${note}'`, note);
     res.json(run);
   });
 
@@ -371,6 +430,7 @@ export async function registerRoutes(
       decision,
     });
     publishWorkspaceEvent("safety-check-created");
+    logActivity("safety_check.created", "safety_check", check.id, `Safety check created: decision='${check.decision}' env='${check.targetEnv}'`);
     res.status(201).json(check);
   });
 
@@ -391,6 +451,7 @@ export async function registerRoutes(
 
     const lesson = await storage.createLesson(parsed.data);
     publishWorkspaceEvent("lesson-created");
+    logActivity("lesson.created", "lesson", lesson.id, `Lesson created: '${lesson.title}'`);
     res.status(201).json(lesson);
   });
 
@@ -409,6 +470,7 @@ export async function registerRoutes(
     const lesson = await storage.updateLesson(lessonId, parsed.data);
     if (!lesson) return next(new HttpError(404, "Lesson not found"));
     publishWorkspaceEvent("lesson-created"); // triggers list refresh
+    logActivity("lesson.updated", "lesson", lesson.id, `Lesson updated: '${lesson.title}'`);
     res.json(lesson);
   });
 
@@ -429,6 +491,7 @@ export async function registerRoutes(
 
     const review = await storage.createReview(parsed.data);
     publishWorkspaceEvent("review-created");
+    logActivity("review.created", "review", review.id, `Review created: status='${review.resultStatus}'`);
     res.status(201).json(review);
   });
 
@@ -447,6 +510,7 @@ export async function registerRoutes(
     const review = await storage.updateReview(reviewId, parsed.data);
     if (!review) return next(new HttpError(404, "Review not found"));
     publishWorkspaceEvent("review-created"); // triggers list refresh
+    logActivity("review.updated", "review", review.id, `Review updated: status='${review.resultStatus}'`);
     res.json(review);
   });
 

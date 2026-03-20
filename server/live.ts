@@ -8,7 +8,8 @@ type WorkspaceEventType =
   | "run-updated"
   | "safety-check-created"
   | "lesson-created"
-  | "review-created";
+  | "review-created"
+  | "activity-log-created";
 
 export interface WorkspaceEvent {
   id: string;

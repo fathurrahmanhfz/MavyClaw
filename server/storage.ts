@@ -4,6 +4,7 @@ import {
   safetyChecks,
   lessons,
   reviews,
+  activityLogs,
   type Scenario,
   type InsertScenario,
   type Run,
@@ -14,6 +15,8 @@ import {
   type InsertLesson,
   type Review,
   type InsertReview,
+  type ActivityLog,
+  type InsertActivityLog,
 } from "@shared/schema";
 import { getAgentIntegrationStatus } from "./agent";
 import { randomUUID } from "crypto";
@@ -48,6 +51,13 @@ export interface StorageSnapshot {
   safetyChecks: SafetyCheck[];
   lessons: Lesson[];
   reviews: Review[];
+  activityLogs: ActivityLog[];
+}
+
+export interface ActivityLogFilter {
+  entityType?: string;
+  entityId?: string;
+  limit?: number;
 }
 
 function clone<T>(value: T): T {
@@ -109,6 +119,11 @@ export interface IStorage {
   getReview(id: string): Promise<Review | undefined>;
   createReview(r: InsertReview): Promise<Review>;
   updateReview(id: string, data: Partial<InsertReview>): Promise<Review | undefined>;
+
+  // Activity Log
+  getActivityLogs(filter?: ActivityLogFilter): Promise<ActivityLog[]>;
+  getActivityLog(id: string): Promise<ActivityLog | undefined>;
+  createActivityLog(entry: InsertActivityLog): Promise<ActivityLog>;
 }
 
 export class MemStorage implements IStorage {
@@ -117,6 +132,7 @@ export class MemStorage implements IStorage {
   protected safetyChecks: Map<string, SafetyCheck> = new Map();
   protected lessons: Map<string, Lesson> = new Map();
   protected reviews: Map<string, Review> = new Map();
+  protected activityLogEntries: Map<string, ActivityLog> = new Map();
 
   constructor(shouldSeed = true) {
     if (shouldSeed) {
@@ -229,6 +245,39 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  // ── Activity Log ──
+  async getActivityLogs(filter?: ActivityLogFilter): Promise<ActivityLog[]> {
+    let entries = Array.from(this.activityLogEntries.values())
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+    if (filter?.entityType) {
+      entries = entries.filter((e) => e.entityType === filter.entityType);
+    }
+    if (filter?.entityId) {
+      entries = entries.filter((e) => e.entityId === filter.entityId);
+    }
+    if (filter?.limit !== undefined && filter.limit > 0) {
+      entries = entries.slice(0, filter.limit);
+    }
+    return entries;
+  }
+
+  async getActivityLog(id: string): Promise<ActivityLog | undefined> {
+    return this.activityLogEntries.get(id);
+  }
+
+  async createActivityLog(entry: InsertActivityLog): Promise<ActivityLog> {
+    const id = randomUUID();
+    const log: ActivityLog = {
+      ...entry,
+      id,
+      entityId: entry.entityId ?? null,
+      actorNote: entry.actorNote ?? null,
+    };
+    this.activityLogEntries.set(id, log);
+    this.persistSnapshot();
+    return log;
+  }
+
   async getRuntimeInfo(): Promise<StorageRuntimeInfo> {
     return {
       runtime: "memory",
@@ -259,6 +308,7 @@ export class MemStorage implements IStorage {
       safetyChecks: Array.from(this.safetyChecks.values()),
       lessons: Array.from(this.lessons.values()),
       reviews: Array.from(this.reviews.values()),
+      activityLogs: Array.from(this.activityLogEntries.values()),
     };
   }
 
@@ -268,6 +318,7 @@ export class MemStorage implements IStorage {
     this.safetyChecks = new Map(snapshot.safetyChecks.map((item) => [item.id, item]));
     this.lessons = new Map(snapshot.lessons.map((item) => [item.id, item]));
     this.reviews = new Map(snapshot.reviews.map((item) => [item.id, item]));
+    this.activityLogEntries = new Map((snapshot.activityLogs ?? []).map((item) => [item.id, item]));
   }
 
   // ── Seed ──
@@ -738,6 +789,7 @@ class FileStorage extends MemStorage {
         safetyChecks: parsed.safetyChecks ?? [],
         lessons: parsed.lessons ?? [],
         reviews: parsed.reviews ?? [],
+        activityLogs: parsed.activityLogs ?? [],
       });
     } catch {
       this.seed();
@@ -771,12 +823,13 @@ class PostgresStorage extends MemStorage {
 
   override async exportSnapshot(): Promise<StorageSnapshot> {
     await this.ready;
-    const [scenarioRows, runRows, safetyRows, lessonRows, reviewRows] = await Promise.all([
+    const [scenarioRows, runRows, safetyRows, lessonRows, reviewRows, activityRows] = await Promise.all([
       this.db.select().from(scenarios).orderBy(scenarios.id),
       this.db.select().from(runs).orderBy(runs.createdAt),
       this.db.select().from(safetyChecks).orderBy(safetyChecks.createdAt),
       this.db.select().from(lessons).orderBy(lessons.createdAt),
       this.db.select().from(reviews).orderBy(reviews.createdAt),
+      this.db.select().from(activityLogs).orderBy(activityLogs.occurredAt),
     ]);
 
     return {
@@ -785,6 +838,7 @@ class PostgresStorage extends MemStorage {
       safetyChecks: safetyRows,
       lessons: lessonRows,
       reviews: reviewRows,
+      activityLogs: activityRows,
     };
   }
 
@@ -793,7 +847,7 @@ class PostgresStorage extends MemStorage {
     await this.pool.query("BEGIN");
 
     try {
-      await this.pool.query("TRUNCATE TABLE reviews, lessons, safety_checks, runs, scenarios");
+      await this.pool.query("TRUNCATE TABLE activity_logs, reviews, lessons, safety_checks, runs, scenarios");
 
       if (snapshot.scenarios.length) {
         await this.db.insert(scenarios).values(snapshot.scenarios);
@@ -810,12 +864,58 @@ class PostgresStorage extends MemStorage {
       if (snapshot.reviews.length) {
         await this.db.insert(reviews).values(snapshot.reviews);
       }
+      if (snapshot.activityLogs?.length) {
+        await this.db.insert(activityLogs).values(snapshot.activityLogs);
+      }
 
       await this.pool.query("COMMIT");
     } catch (error) {
       await this.pool.query("ROLLBACK");
       throw error;
     }
+  }
+
+  override async getActivityLogs(filter?: ActivityLogFilter): Promise<ActivityLog[]> {
+    await this.ready;
+    let query = this.db.select().from(activityLogs).$dynamic();
+    if (filter?.entityType) {
+      query = query.where(eq(activityLogs.entityType, filter.entityType));
+    }
+    // Note: entityId filter applied post-fetch when entityType is also set,
+    // since drizzle dynamic where chains require care with multiple conditions.
+    // For simplicity and safety we apply both in memory after the DB fetch.
+    const rows = await query.orderBy(activityLogs.occurredAt);
+    let filtered = rows.reverse(); // newest first
+    if (filter?.entityType) {
+      filtered = filtered.filter((r) => r.entityType === filter.entityType);
+    }
+    if (filter?.entityId) {
+      filtered = filtered.filter((r) => r.entityId === filter.entityId);
+    }
+    if (filter?.limit !== undefined && filter.limit > 0) {
+      filtered = filtered.slice(0, filter.limit);
+    }
+    return filtered;
+  }
+
+  override async getActivityLog(id: string): Promise<ActivityLog | undefined> {
+    await this.ready;
+    const [record] = await this.db.select().from(activityLogs).where(eq(activityLogs.id, id));
+    return record;
+  }
+
+  override async createActivityLog(entry: InsertActivityLog): Promise<ActivityLog> {
+    await this.ready;
+    const [record] = await this.db
+      .insert(activityLogs)
+      .values({
+        ...entry,
+        id: randomUUID(),
+        entityId: entry.entityId ?? null,
+        actorNote: entry.actorNote ?? null,
+      })
+      .returning();
+    return record;
   }
 
   override async getScenarios(): Promise<Scenario[]> {
@@ -1048,6 +1148,16 @@ class PostgresStorage extends MemStorage {
         near_miss text NOT NULL,
         safest_next_step text NOT NULL,
         created_at text NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id varchar PRIMARY KEY,
+        action text NOT NULL,
+        entity_type text NOT NULL,
+        entity_id varchar,
+        summary text NOT NULL,
+        actor_note text,
+        occurred_at text NOT NULL
       );
     `);
 

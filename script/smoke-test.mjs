@@ -571,6 +571,64 @@ async function run() {
       assert(Boolean(created), "Created run was not found after restart");
     }
 
+    // ── Activity Log smoke coverage ───────────────────────────────────────
+
+    // 1. GET /api/activity — should return recent entries (we just ran a full flow)
+    const activityAll = await fetchJson("/api/activity");
+    assert(activityAll.response.ok, `GET /api/activity failed: ${activityAll.text}`);
+    assert(Array.isArray(activityAll.body), "Expected activity log to be an array");
+    assert(activityAll.body.length > 0, "Expected at least one activity log entry after smoke flow");
+
+    // All entries should have required fields
+    const firstEntry = activityAll.body[0];
+    assert(typeof firstEntry.id === "string", "Activity log entry missing id");
+    assert(typeof firstEntry.action === "string", "Activity log entry missing action");
+    assert(typeof firstEntry.entityType === "string", "Activity log entry missing entityType");
+    assert(typeof firstEntry.summary === "string", "Activity log entry missing summary");
+    assert(typeof firstEntry.occurredAt === "string", "Activity log entry missing occurredAt");
+
+    // 2. Filter by entityType=run
+    const activityRuns = await fetchJson("/api/activity?entityType=run");
+    assert(activityRuns.response.ok, `GET /api/activity?entityType=run failed: ${activityRuns.text}`);
+    assert(Array.isArray(activityRuns.body), "Expected filtered activity to be an array");
+    assert(
+      activityRuns.body.every((e) => e.entityType === "run"),
+      "entityType filter returned non-run entries"
+    );
+    assert(activityRuns.body.length > 0, "Expected at least one run activity entry");
+
+    // 3. Filter by entityType + entityId
+    const firstRunEntry = activityRuns.body[0];
+    const activityByEntityId = await fetchJson(`/api/activity?entityType=run&entityId=${firstRunEntry.entityId}`);
+    assert(activityByEntityId.response.ok, `GET /api/activity?entityId filter failed: ${activityByEntityId.text}`);
+    assert(Array.isArray(activityByEntityId.body), "Expected entityId-filtered activity to be an array");
+    assert(
+      activityByEntityId.body.every((e) => e.entityId === firstRunEntry.entityId),
+      "entityId filter returned entries with wrong entityId"
+    );
+
+    // 4. Limit param
+    const activityLimited = await fetchJson("/api/activity?limit=1");
+    assert(activityLimited.response.ok, `GET /api/activity?limit=1 failed: ${activityLimited.text}`);
+    assert(activityLimited.body.length <= 1, "Limit param did not restrict results");
+
+    // 5. GET /api/activity/:id — fetch a specific entry
+    const activityById = await fetchJson(`/api/activity/${firstEntry.id}`);
+    assert(activityById.response.ok, `GET /api/activity/:id failed: ${activityById.text}`);
+    assert(activityById.body.id === firstEntry.id, "Activity log entry id mismatch");
+
+    // 6. Non-existent entry should return 404
+    const notFoundEntry = await fetchJson("/api/activity/does-not-exist");
+    assert(notFoundEntry.response.status === 404, `Expected 404 for missing activity entry, got ${notFoundEntry.response.status}`);
+
+    // 7. Activity log should be newest-first (if > 1 entry)
+    if (activityAll.body.length > 1) {
+      assert(
+        activityAll.body[0].occurredAt >= activityAll.body[activityAll.body.length - 1].occurredAt,
+        "Activity log is not sorted newest-first"
+      );
+    }
+
     console.log(`${logPrefix} Smoke test passed`);
   } finally {
     await stopServer(server);
